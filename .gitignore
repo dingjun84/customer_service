@@ -1,8 +1,9 @@
 # 本地数据库与构建产物
 data/
 bin/
-server
-customer_service
+# 只忽略仓库根目录的编译产物；写成 server 会把 cmd/server/ 也一起忽略掉
+/server
+/customer_service
 
 # 环境变量与密钥
 .env
