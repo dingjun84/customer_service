@@ -35,6 +35,12 @@ type Config struct {
 
 	AfterSalesWindowDays int
 	PriceProtectionDays  int
+
+	// Admin console. The built-in account is only created when admin_users is
+	// empty, so changing these values never rewrites an existing password.
+	AdminUsername   string
+	AdminPassword   string
+	AdminSessionTTL time.Duration
 }
 
 // IsDev reports whether dev-only endpoints and the demo identity header are allowed.
@@ -81,6 +87,9 @@ func Load() (Config, error) {
 		ToolTimeout:             seconds("TOOL_TIMEOUT_SECONDS", 10),
 		AfterSalesWindowDays:    integer("AFTER_SALES_WINDOW_DAYS", 7),
 		PriceProtectionDays:     integer("PRICE_PROTECTION_WINDOW_DAYS", 15),
+		AdminUsername:           str("ADMIN_USERNAME", "admin"),
+		AdminPassword:           str("ADMIN_PASSWORD", defaultAdminPassword),
+		AdminSessionTTL:         hours("ADMIN_SESSION_TTL_HOURS", 12),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -88,6 +97,15 @@ func Load() (Config, error) {
 	}
 	return cfg, nil
 }
+
+// defaultAdminPassword is the built-in console password for local development.
+// Validate refuses to start outside dev/test while it is still in use, so the
+// demo login can never quietly become a production one.
+const defaultAdminPassword = "admin12345"
+
+// IsDefaultAdminPassword reports whether the console still uses the shipped
+// development password.
+func (c Config) IsDefaultAdminPassword() bool { return c.AdminPassword == defaultAdminPassword }
 
 // Validate reports the first configuration problem with an actionable message.
 func (c Config) Validate() error {
@@ -141,6 +159,18 @@ func (c Config) Validate() error {
 	}
 	if c.PendingActionTTL <= 0 {
 		return fmt.Errorf("PENDING_ACTION_TTL_MINUTES must be positive")
+	}
+	if strings.TrimSpace(c.AdminUsername) == "" {
+		return fmt.Errorf("ADMIN_USERNAME must not be empty")
+	}
+	if len([]rune(c.AdminPassword)) < 8 {
+		return fmt.Errorf("ADMIN_PASSWORD must be at least 8 characters")
+	}
+	if !c.IsDev() && c.IsDefaultAdminPassword() {
+		return fmt.Errorf("ADMIN_PASSWORD must be changed from the development default when APP_ENV=%s", c.AppEnv)
+	}
+	if c.AdminSessionTTL <= 0 || c.AdminSessionTTL > 720*time.Hour {
+		return fmt.Errorf("ADMIN_SESSION_TTL_HOURS must be within 1..720")
 	}
 	return nil
 }
@@ -213,4 +243,8 @@ func seconds(key string, def int) time.Duration {
 
 func minutes(key string, def int) time.Duration {
 	return time.Duration(integer(key, def)) * time.Minute
+}
+
+func hours(key string, def int) time.Duration {
+	return time.Duration(integer(key, def)) * time.Hour
 }

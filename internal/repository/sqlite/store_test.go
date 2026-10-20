@@ -40,6 +40,10 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	ctx := context.Background()
 	db := newTestDB(t)
 
+	before, err := database.SchemaVersion(ctx, db)
+	if err != nil {
+		t.Fatalf("schema version: %v", err)
+	}
 	// Running the embedded migrations again must be a no-op.
 	if err := database.Migrate(ctx, db); err != nil {
 		t.Fatalf("second migrate: %v", err)
@@ -48,8 +52,8 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("schema version: %v", err)
 	}
-	if version != 1 {
-		t.Fatalf("schema version = %d, want 1", version)
+	if version != before {
+		t.Fatalf("schema version = %d, want %d after re-running migrations", version, before)
 	}
 	var count int
 	if err := db.QueryRowContext(ctx,

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>客服运营后台</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<!-- Login -->
+<div id="login" class="login" hidden>
+  <form id="login-form" class="login-card" autocomplete="on">
+    <div class="login-brand">
+      <div class="brand-mark">CS</div>
+      <div>
+        <div class="login-title">客服运营后台</div>
+        <div class="login-sub">请使用管理员账号登录</div>
+      </div>
+    </div>
+    <label class="field">
+      <span>用户名</span>
+      <input id="login-username" name="username" type="text" autocomplete="username" required>
+    </label>
+    <label class="field">
+      <span>密码</span>
+      <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+    </label>
+    <div id="login-error" class="form-error" hidden></div>
+    <button id="login-submit" class="btn btn-primary btn-block" type="submit">登录</button>
+    <p id="login-hint" class="login-hint" hidden></p>
+  </form>
+</div>
+
+<!-- Shell -->
+<div id="app" class="shell" hidden>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">CS</div>
+      <div class="brand-text">
+        <div class="brand-title">客服运营后台</div>
+        <div class="brand-sub" id="brand-sub">—</div>
+      </div>
+    </div>
+    <nav id="nav" class="nav"></nav>
+    <div class="sidebar-foot">
+      <div class="who">
+        <div class="who-avatar" id="who-avatar">A</div>
+        <div class="who-text">
+          <div class="who-name" id="who-name">—</div>
+          <div class="who-role" id="who-role">—</div>
+        </div>
+      </div>
+      <div class="foot-actions">
+        <button id="theme-toggle" class="btn btn-quiet btn-sm" type="button" title="切换主题">主题</button>
+        <button id="logout" class="btn btn-quiet btn-sm" type="button">退出</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1 id="page-title">概览</h1>
+        <p id="page-desc" class="page-desc"></p>
+      </div>
+      <div class="topbar-actions">
+        <span class="live-dot" id="live-dot" title="数据已连接"></span>
+        <span class="topbar-meta" id="generated-at"></span>
+        <button id="refresh" class="btn btn-ghost btn-sm" type="button">刷新</button>
+      </div>
+    </header>
+    <section id="view" class="view" aria-live="polite"></section>
+  </main>
+</div>
+
+<!-- Detail drawer -->
+<div id="drawer" class="drawer" hidden>
+  <div class="drawer-backdrop" data-close="drawer"></div>
+  <aside class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+    <header class="drawer-head">
+      <div>
+        <h2 id="drawer-title">详情</h2>
+        <p id="drawer-sub" class="drawer-sub"></p>
+      </div>
+      <button class="icon-btn" data-close="drawer" type="button" aria-label="关闭">×</button>
+    </header>
+    <div id="drawer-body" class="drawer-body"></div>
+  </aside>
+</div>
+
+<!-- Modal (knowledge editor) -->
+<div id="modal" class="modal" hidden>
+  <div class="modal-backdrop" data-close="modal"></div>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <header class="modal-head">
+      <h2 id="modal-title">编辑</h2>
+      <button class="icon-btn" data-close="modal" type="button" aria-label="关闭">×</button>
+    </header>
+    <div id="modal-body" class="modal-body"></div>
+    <footer id="modal-foot" class="modal-foot"></footer>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="admin.js" defer></script>
+</body>
+</html>

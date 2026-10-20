@@ -17,6 +17,7 @@ const (
 	CodeForbidden           ErrorCode = "forbidden"
 	CodeNotFound            ErrorCode = "not_found"
 	CodeConflict            ErrorCode = "conflict"
+	CodeRateLimited         ErrorCode = "rate_limited"
 	CodeConfirmationNeeded  ErrorCode = "confirmation_required"
 	CodeActionExpired       ErrorCode = "action_expired"
 	CodeLLMUnavailable      ErrorCode = "llm_unavailable"
@@ -37,6 +38,8 @@ func HTTPStatus(code ErrorCode) int {
 		return http.StatusNotFound
 	case CodeConflict, CodeConfirmationNeeded:
 		return http.StatusConflict
+	case CodeRateLimited:
+		return http.StatusTooManyRequests
 	case CodeActionExpired:
 		return http.StatusGone
 	case CodeLLMUnavailable:

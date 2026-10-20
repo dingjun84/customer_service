@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/example/ecommerce-support/internal/adminapi"
 	"github.com/example/ecommerce-support/internal/config"
 	"github.com/example/ecommerce-support/internal/conversation"
 	"github.com/example/ecommerce-support/internal/database"
@@ -25,18 +26,20 @@ type Server struct {
 	store     repository.Store
 	svc       *service.Services
 	conv      *conversation.Service
+	admin     *adminapi.Server
 	logger    *slog.Logger
 	startedAt time.Time
 }
 
-// NewServer builds the HTTP server.
+// NewServer builds the HTTP server. adminServer may be nil in tests that only
+// exercise the customer API; the console routes are then simply not registered.
 func NewServer(cfg config.Config, db *sql.DB, store repository.Store, svc *service.Services,
-	conv *conversation.Service, logger *slog.Logger) *Server {
+	conv *conversation.Service, adminServer *adminapi.Server, logger *slog.Logger) *Server {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	return &Server{
-		cfg: cfg, db: db, store: store, svc: svc, conv: conv,
+		cfg: cfg, db: db, store: store, svc: svc, conv: conv, admin: adminServer,
 		logger: logger, startedAt: time.Now(),
 	}
 }
@@ -70,6 +73,7 @@ func (s *Server) Handler() http.Handler {
 
 	// Dev-only diagnostics: never registered outside dev/test.
 	if s.cfg.DevAPIAllowed() {
+		mux.HandleFunc("GET /api/v1/dev/customers", s.handleListDemoCustomers)
 		mux.HandleFunc("GET /api/v1/dev/conversations/{conversationID}/trace", s.handleConversationTrace)
 		mux.HandleFunc("GET /api/v1/dev/tool-executions", s.handleToolExecutions)
 	}
@@ -79,6 +83,14 @@ func (s *Server) Handler() http.Handler {
 	notFound := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, s.logger, domain.NotFoundError("接口不存在"))
 	})
+
+	// Operations console: its own account-based auth, its own document.
+	if s.admin != nil {
+		s.admin.Register(mux)
+		mux.Handle("GET /admin/", web.AdminHandler(notFound))
+		mux.Handle("GET /admin", web.AdminHandler(notFound))
+	}
+
 	mux.Handle("/", web.Handler(notFound))
 
 	return s.withRecovery(s.withRequestID(s.withAccessLog(s.withIdentity(mux))))
@@ -107,14 +119,46 @@ func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
 		writeReadyFailure(w, r, "migration_status_unknown")
 		return
 	}
-	writeData(w, r, map[string]any{
+	payload := map[string]any{
 		"status":         "ready",
 		"schema_version": version,
 		"llm_mode":       s.cfg.LLMMode(),
 		"llm_enabled":    s.cfg.LLMEnabled,
 		"llm_configured": s.cfg.LLMEnabled && s.cfg.LLMBaseURL != "" && s.cfg.LLMModel != "",
 		"dev_api":        s.cfg.DevAPIAllowed(),
-	}, nil)
+	}
+	// In dev the console needs to answer "am I looking at the seeded dataset?".
+	// Exposing the path or row counts in prod would leak deployment details, so
+	// this block is dev/test only.
+	if s.cfg.IsDev() {
+		payload["db_path"] = s.cfg.DBPath
+		if counts, err := s.datasetCounts(r.Context()); err == nil {
+			payload["dataset"] = counts
+		}
+	}
+	writeData(w, r, payload, nil)
+}
+
+// datasetCounts reports the row counts the console shows as a sanity check that
+// the running process opened the same database the seed wrote.
+func (s *Server) datasetCounts(ctx context.Context) (map[string]int, error) {
+	const q = `
+SELECT (SELECT COUNT(*) FROM customers),
+       (SELECT COUNT(*) FROM products),
+       (SELECT COUNT(*) FROM orders),
+       (SELECT COUNT(*) FROM conversations),
+       (SELECT COUNT(*) FROM messages)`
+	var customers, products, orders, conversations, messages int
+	if err := s.db.QueryRowContext(ctx, q).Scan(&customers, &products, &orders, &conversations, &messages); err != nil {
+		return nil, err
+	}
+	return map[string]int{
+		"customers":     customers,
+		"products":      products,
+		"orders":        orders,
+		"conversations": conversations,
+		"messages":      messages,
+	}, nil
 }
 
 func writeReadyFailure(w http.ResponseWriter, r *http.Request, reason string) {

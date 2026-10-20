@@ -75,5 +75,20 @@ func baseConfig() config.Config {
 		ConversationRecentTurns: 6, ConversationMaxChars: 40000,
 		PendingActionTTL: 10 * time.Minute, ToolTimeout: 10 * time.Second,
 		AfterSalesWindowDays: 7, PriceProtectionDays: 15,
+		AdminUsername: "admin", AdminPassword: "test-password-1", AdminSessionTTL: 12 * time.Hour,
+	}
+}
+
+func TestValidateRejectsDefaultAdminPasswordOutsideDev(t *testing.T) {
+	cfg := baseConfig()
+	cfg.AppEnv = "prod"
+	cfg.DevAPIEnabled = false
+	cfg.AdminPassword = "admin12345"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected error: shipped console password must not reach prod")
+	}
+	cfg.AdminPassword = "a-stronger-password"
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

@@ -38,6 +38,9 @@ func (s *Server) withRequestID(next http.Handler) http.Handler {
 			id = "req_" + domain.NewID()
 		}
 		w.Header().Set("X-Request-ID", id)
+		// Downstream handlers in other packages (the admin console) read the
+		// normalised id from the request header rather than a private ctx key.
+		r.Header.Set("X-Request-ID", id)
 		ctx := context.WithValue(r.Context(), ctxKeyRequestID, id)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

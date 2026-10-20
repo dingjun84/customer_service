@@ -74,7 +74,7 @@ func newTestServer(t *testing.T, model ai.ChatModel, mutate func(*config.Config)
 	if mutate != nil {
 		mutate(&cfg)
 	}
-	ts.handler = httpapi.NewServer(cfg, db, ts.store, services, convSvc, logger).Handler()
+	ts.handler = httpapi.NewServer(cfg, db, ts.store, services, convSvc, nil, logger).Handler()
 	return ts
 }
 
@@ -182,8 +182,14 @@ func TestHealthAndReadiness(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("readyz = %d", rec.Code)
 	}
-	if dataObject(t, body)["schema_version"] != float64(1) {
-		t.Fatalf("readyz body = %v", body)
+	// Compare against the migration set actually embedded in this build rather
+	// than a hardcoded version, so adding a migration does not break readiness.
+	wantVersion, err := database.SchemaVersion(ts.ctx, ts.db)
+	if err != nil {
+		t.Fatalf("schema version: %v", err)
+	}
+	if dataObject(t, body)["schema_version"] != float64(wantVersion) {
+		t.Fatalf("readyz body = %v, want schema_version %d", body, wantVersion)
 	}
 }
 
@@ -573,5 +579,68 @@ func TestRequestBodyLimit(t *testing.T) {
 	ts.handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
+// TestDevCustomerDirectoryMatchesDataset guards the identity switcher: the
+// browser console builds its customer list from this endpoint, so it must list
+// every seeded customer with counts that match the real tables.
+func TestDevCustomerDirectoryMatchesDataset(t *testing.T) {
+	ts := newTestServer(t, nil, nil)
+
+	rec, body := ts.do(http.MethodGet, "/api/v1/dev/customers", "CUST-1001", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %v", rec.Code, body)
+	}
+	list := dataList(t, body)
+	if len(list) == 0 {
+		t.Fatal("customer directory is empty")
+	}
+
+	var customers int
+	if err := ts.db.QueryRow(`SELECT COUNT(*) FROM customers`).Scan(&customers); err != nil {
+		t.Fatalf("count customers: %v", err)
+	}
+	if len(list) != customers {
+		t.Fatalf("directory has %d customers, table has %d", len(list), customers)
+	}
+
+	meta := body["meta"].(map[string]any)
+	var orders int
+	if err := ts.db.QueryRow(`SELECT COUNT(*) FROM orders`).Scan(&orders); err != nil {
+		t.Fatalf("count orders: %v", err)
+	}
+	if int(meta["order_total"].(float64)) != orders {
+		t.Fatalf("meta.order_total = %v, want %d", meta["order_total"], orders)
+	}
+
+	for _, raw := range list {
+		entry := raw.(map[string]any)
+		no := entry["customer_no"].(string)
+		var actual int
+		err := ts.db.QueryRow(
+			`SELECT COUNT(*) FROM orders o JOIN customers c ON c.id = o.customer_id WHERE c.customer_no = ?`,
+			no).Scan(&actual)
+		if err != nil {
+			t.Fatalf("count orders of %s: %v", no, err)
+		}
+		if int(entry["order_count"].(float64)) != actual {
+			t.Fatalf("%s order_count = %v, want %d", no, entry["order_count"], actual)
+		}
+	}
+}
+
+// TestDevCustomerDirectoryHiddenInProd makes sure the console falls back to its
+// hard-coded pair instead of leaking a dev-only listing in production. Either
+// the route is absent (404) or the demo identity header is rejected (401); both
+// mean no directory is published outside dev/test.
+func TestDevCustomerDirectoryHiddenInProd(t *testing.T) {
+	ts := newTestServer(t, nil, func(c *config.Config) {
+		c.AppEnv = "prod"
+		c.DevAPIEnabled = false
+	})
+	rec, _ := ts.do(http.MethodGet, "/api/v1/dev/customers", "CUST-1001", nil)
+	if rec.Code != http.StatusNotFound && rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 404 or 401", rec.Code)
 	}
 }

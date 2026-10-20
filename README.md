@@ -71,7 +71,7 @@ make smoke-llm
 
 | 区域 | 能做什么 |
 |---|---|
-| 顶栏 | 切换演示身份（CUST-1001 / CUST-1002）、查看对话模型模式、全局刷新 |
+| 顶栏 | 切换演示身份（下拉从 `/api/v1/dev/customers` 动态列出全部 20 位客户及各自订单数）、查看对话模型模式、全局刷新；标题下方显示当前进程打开的库与规模（如 `ecommerce_support.db · 118 单 / 89 会话`） |
 | 左栏 | 新建会话、会话列表（状态 / 时间 / 待确认数量） |
 | 中间 | 聊天、工具调用条（工具名 + 状态 + 耗时）、待确认操作卡片（预览 / 倒计时 / 确认 / 拒绝）、快捷提问、失败重试 |
 | 右栏 · 订单 | 状态筛选、订单详情、物流轨迹、售后单、发票 |
@@ -85,13 +85,46 @@ make smoke-llm
 2. 输入「我要取消 ORD-10002」→ 出现待确认卡片（此时订单**尚未**变化，可在右栏核对）。
 3. 点「确认执行」→ 聊天里出现执行结果卡，右栏订单状态变成「已取消」，链路/审计出现工具调用与 before-after。
 4. 输入「ORD-10003 到哪了」→ 物流轨迹；「我要取消 ORD-10003」→ 资格拒绝（已发货），不会写任何数据。
-5. 切到 CUST-1002 → 只能看到李四自己的订单，越权请求返回 403。
+5. 切到 CUST-1002（或下拉里任意客户）→ 只能看到该客户自己的订单，越权请求返回 403。
 
 界面细节：待确认卡片展示 `pending_actions.preview`（订单号 / 预计退款 / 变更前后值），倒计时到 0 提示过期；发送失败时消息已落库，点「重试」会复用同一个 `client_message_id`，不会重复插入。
 
 ---
 
-## 3. 演示数据
+## 3. 运营后台（/admin/）
+
+面向客服主管的跨客户视图，与上面的客户控制台同进程、同端口、**不同身份体系**：
+客户控制台用 `X-Demo-Customer-ID`（仅 dev）模拟单个客户，后台用账号密码登录，走服务端会话 Cookie。
+
+```bash
+make run          # 或 LLM_PROVIDER=offline make run
+open http://localhost:8080/admin/
+```
+
+首次启动时，若 `admin_users` 为空，会用 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 创建内置管理员；
+默认是 `admin / admin12345`，只在 `APP_ENV=dev|test` 下允许，其他环境不换密码会**拒绝启动**。
+已有账号时这两个变量被忽略——改环境变量不会重置线上密码，这是刻意为之。
+
+| 分区 | 页面 | 主要看什么 |
+|---|---|---|
+| 运营 | 概览 | 会话量、自助解决率、工具成功率、待办队列、14 天趋势、意图 Top |
+| 运营 | 会话 | 跨客户会话列表；详情含完整消息（含 tool 轮次）、工具轨迹、意图标注、关联订单、审计 |
+| 运营 | 工单 | 按优先级与等待时长排序；详情可做状态流转（带状态机校验）并留处理记录 |
+| 运营 | 待确认动作 | 客户尚未确认的取消/修改/售后提案；**只能作废，不能代客户确认** |
+| 质量 | 工具监控 | 每个工具的调用量、成功率、平均/P95 耗时、主要错误码；可下钻到单次入参与结果 |
+| 质量 | 意图分析 | 各意图的样本量、解决率、转人工率、情绪分布 |
+| 质量 | 知识库 | 文章增删改查、发布/归档、版本号；内容会被 `search_knowledge` 工具检索 |
+| 业务数据 | 客户 / 订单 / 商品 | 客户画像与权益、订单全链路（明细/包裹/支付/退款/售后/发票）、SKU 价格库存 |
+| 业务数据 | 售后与财务 | 售后单、退款、发票、促销四个页签 |
+| 治理 | 审计日志 | 所有写操作的 before/after 快照与操作人 |
+| 治理 | 系统状态 | 迁移版本、各表行数、活跃会话、幂等键规模 |
+
+写操作只有三类，且全部落 `action_audit_logs`（`actor_type=admin`）：工单状态流转与处理记录、
+知识库文章增改与发布、作废待确认动作。后台不提供通用 CRUD，也不会修改订单。
+
+---
+
+## 4. 演示数据
 
 `go run ./cmd/seed`（`-reset` 清库重写，仅 dev/test）写入一整套有业务因果关系的虚构数据，
 不是随机组合：
@@ -118,6 +151,24 @@ make smoke-llm
 评测元数据（场景、期望工具、禁止动作）写在 `testdata/`，不入库，细节见 `testdata/README.md`
 与 `docs/测试数据字段映射审核.md`。
 
+![加载演示数据后的控制台](docs/screenshots/console-seeded-data.png)
+
+### 数据是怎么进到界面里的
+
+seed 不是导出一个 SQL 文件让你手动导入，它直接写服务读的那个 SQLite 文件：
+
+1. `go run ./cmd/seed -reset` 写 `./data/ecommerce_support.db`（路径可用 `DB_PATH` 覆盖）。
+2. 服务启动时打开同一个 `DB_PATH`，所以**重启服务就是唯一需要的"加载"动作**；`go run` 会重新编译并内嵌最新的 `web/`。
+3. 界面左上角标题下方会显示 `ecommerce_support.db · 118 单 / 89 会话 / 461 消息`，这是服务实时查库的结果，不是写死的文案——看到这行就说明数据和页面已经对上了。
+
+对不上时按这三步自查：
+
+```bash
+curl -s localhost:8080/readyz | jq '.data | {db_path, dataset}'   # 进程打开的是哪个库、里面有多少行
+curl -s -H 'X-Demo-Customer-ID: CUST-1001' localhost:8080/api/v1/dev/customers | jq '.meta'
+ls -la data/                                                       # dev.db 是早期 12 单的旧库，别被它误导
+```
+
 需要按状态找样本时不要写死订单号，直接查库：
 
 ```sql
@@ -126,7 +177,7 @@ SELECT order_no FROM orders WHERE order_status = 'shipped' LIMIT 5;
 
 ---
 
-## 4. 目录结构
+## 5. 目录结构
 
 ```text
 cmd/server            启动 HTTP 服务（配置 → 迁移 → 装配 → 优雅关闭）
@@ -141,8 +192,10 @@ internal/tools        17 个工具定义（JSON Schema）、参数校验、分�
 internal/ai           ChatModel 接口、OpenAI 适配器、上下文组装、工具循环
 internal/conversation 会话/消息、客户端重试幂等、调用编排
 internal/httpapi      路由、中间件、DTO、统一错误 Envelope
-web                   控制台页面（go:embed，无构建步骤）
-migrations            0001_init.sql（go:embed）
+internal/admin        后台领域层：账号与会话、跨客户读模型、工单状态机、知识库
+internal/adminapi     /api/admin/v1 路由、Cookie 会话中间件、错误 Envelope
+web                   两个控制台页面（go:embed，无构建步骤）
+migrations            0001_init.sql / 0002_admin_console.sql（go:embed）
 docs                  api.md、agent-tool-catalog.md
 ```
 
@@ -150,7 +203,7 @@ docs                  api.md、agent-tool-catalog.md
 
 ---
 
-## 5. 安全边界（核心设计）
+## 6. 安全边界（核心设计）
 
 1. **模型不碰数据库**：没有任何"执行 SQL"的工具，读写只能走 17 个已注册工具，参数先过 JSON Schema 校验（未知字段直接拒绝）。
 2. **身份不可被模型覆盖**：客户身份来自 `X-Demo-Customer-ID`（仅 dev/test）并由中间件写入 context；所有工具都不接受 `customer_id` 参数，服务层再做一次归属校验。
@@ -162,7 +215,7 @@ docs                  api.md、agent-tool-catalog.md
 
 ---
 
-## 6. API 概览
+## 7. API 概览
 
 统一前缀 `/api/v1`，所有请求需要 `X-Demo-Customer-ID`（dev/test）。成功 `{"data":…,"meta":…}`，失败 `{"error":{"code","message","request_id"}}`。完整契约见 [`docs/api.md`](docs/api.md)。
 
@@ -190,7 +243,7 @@ curl -H 'X-Demo-Customer-ID: CUST-1001' \
 
 ---
 
-## 7. 业务规则实现位置
+## 8. 业务规则实现位置
 
 | 规则 | 位置 |
 |---|---|
@@ -205,7 +258,7 @@ curl -H 'X-Demo-Customer-ID: CUST-1001' \
 
 ---
 
-## 8. 测试
+## 9. 测试
 
 ```bash
 gofmt -w .
@@ -228,7 +281,7 @@ go vet ./...
 
 ---
 
-## 9. 已知限制
+## 10. 已知限制
 
 - 生产鉴权未实现：`X-Demo-Customer-ID` 只在 dev/test 生效，其它环境一律 401（fail-closed）。
 - 单实例：SQLite + WAL，适合本地演示；多实例/高并发写应迁移 PostgreSQL。
@@ -242,7 +295,7 @@ go vet ./...
 
 ---
 
-## 10. 环境变量
+## 11. 环境变量
 
 见 `.env.example`。关键项：
 
@@ -258,3 +311,6 @@ go vet ./...
 | `CONVERSATION_RECENT_TURNS` | 6 | 上下文窗口的完整轮次数 |
 | `PENDING_ACTION_TTL_MINUTES` | 10 | 待确认动作有效期 |
 | `TOOL_TIMEOUT_SECONDS` | 10 | 单次工具执行超时 |
+| `ADMIN_USERNAME` | `admin` | 后台内置账号；只在 `admin_users` 为空时使用 |
+| `ADMIN_PASSWORD` | `admin12345` | 同上；非 dev/test 未改则拒绝启动（至少 8 位） |
+| `ADMIN_SESSION_TTL_HOURS` | 12 | 后台会话有效期 |
