@@ -90,21 +90,48 @@ func (o *Orchestrator) Run(ctx context.Context, in TurnInput) (*TurnResult, erro
 		return nil, domain.NewError(domain.CodeInternal, "会话上下文缺失")
 	}
 
+	started := time.Now()
+	// turn_id ties every model call and tool trace of this user message together,
+	// so one line in the log is enough to find the whole turn.
+	turnID := "turn_" + domain.NewID()
+	meta := CallMeta{
+		ConversationID: in.Conversation.ID,
+		RequestID:      in.RequestID,
+		TurnID:         turnID,
+	}
+
 	msgs := o.assembler.Build(in.Conversation, in.History)
 	result := &TurnResult{ToolTraces: []ToolTrace{}}
 	usedCalls := 0
 
+	defer func() {
+		o.logger.Info("llm turn finished",
+			"conversation_id", meta.ConversationID,
+			"request_id", meta.RequestID,
+			"turn_id", turnID,
+			"rounds", result.Rounds,
+			"tool_calls", result.ToolCalls,
+			"degraded", result.Degraded,
+			"prompt_chars", PromptChars(msgs),
+			"message_count", len(msgs),
+			"latency_ms", time.Since(started).Milliseconds())
+	}()
+
 	for round := 1; round <= o.limits.MaxRounds; round++ {
 		result.Rounds = round
+		callMeta := meta
+		callMeta.Round = round
 		resp, err := o.model.Respond(ctx, ModelRequest{
 			Messages:    msgs,
 			Tools:       o.registry.OpenAITools(),
 			Temperature: 0.2,
+			Meta:        callMeta,
 		})
 		if err != nil {
-			o.logger.Warn("llm call failed",
+			o.logger.Warn("llm round failed",
 				"conversation_id", in.Conversation.ID,
 				"request_id", in.RequestID,
+				"turn_id", turnID,
 				"round", round,
 				"error", err.Error())
 			return nil, domain.NewError(domain.CodeLLMUnavailable, "智能客服暂时不可用，请稍后重试或转人工").Wrap(err)

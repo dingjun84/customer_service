@@ -189,7 +189,7 @@ internal/domain       实体、状态枚举、金额/时间工具、业务错误
 internal/repository   Store 接口 + sqlite 实现（参数化 SQL、事务）
 internal/service      查询服务、资格规则、待确认动作状态机、工单
 internal/tools        17 个工具定义（JSON Schema）、参数校验、分发
-internal/ai           ChatModel 接口、OpenAI 适配器、上下文组装、工具循环
+internal/ai           ChatModel 接口、OpenAI 适配器、上下文组装、工具循环、调用日志（calllog.go）
 internal/conversation 会话/消息、客户端重试幂等、调用编排
 internal/httpapi      路由、中间件、DTO、统一错误 Envelope
 internal/admin        后台领域层：账号与会话、跨客户读模型、工单状态机、知识库
@@ -273,6 +273,7 @@ go vet ./...
 - 动作：确认写库+退款+审计、重复确认幂等、拒绝不改数据、过期 410、并发版本冲突 409。
 - 工具：未知工具拒绝、非法 JSON / 未知字段 / 枚举越界、只能看到自己的订单。
 - AI：直接回答、单次工具调用、工具失败不编造、未知工具标记 rejected、轮次/调用次数上限、LLM 关闭。
+- 调用日志：级别门控（summary 不写文本 / detail 不写整包）、手机号与身份证掩码、每次重试单独成对记录、上游 400 的响应体留痕。
 - HTTP：healthz/readyz、401/403/404/409/410/503、请求体上限、`client_message_id` 重放、dev API 开关。
 - 数据集：规模落在规范区间、12 个一级意图各 ≥5 个场景、多轮 ≥20、高风险 ≥12；并反向测试
   「退款超额」「签收后在派送」「售后单跨单引用」等矛盾会被校验器拦下（`internal/seed/seed_test.go`）。
@@ -308,9 +309,73 @@ go vet ./...
 | `LLM_PROVIDER` | `openai` | `openai` 走真实模型；`offline` 用本地规则演示模型（仅 dev/test） |
 | `LLM_ENABLED` / `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | 关闭 | 关闭时聊天返回 `llm_unavailable` |
 | `LLM_MAX_TOOL_ROUNDS` / `LLM_MAX_TOOL_CALLS_PER_TURN` | 5 / 8 | 单条用户消息的硬上限 |
+| `LLM_LOG_LEVEL` | `detail` | `off`/`summary`/`detail`/`full`，见第 12 节 |
+| `LLM_LOG_FILE` | `./data/llm_calls.jsonl` | 追加写的 JSONL；`-` 表示只写进程日志 |
+| `LLM_LOG_BODY_CHARS` | 4000 | `full` 级别下单侧请求/响应体的截断上限 |
 | `CONVERSATION_RECENT_TURNS` | 6 | 上下文窗口的完整轮次数 |
 | `PENDING_ACTION_TTL_MINUTES` | 10 | 待确认动作有效期 |
 | `TOOL_TIMEOUT_SECONDS` | 10 | 单次工具执行超时 |
 | `ADMIN_USERNAME` | `admin` | 后台内置账号；只在 `admin_users` 为空时使用 |
 | `ADMIN_PASSWORD` | `admin12345` | 同上；非 dev/test 未改则拒绝启动（至少 8 位） |
 | `ADMIN_SESSION_TTL_HOURS` | 12 | 后台会话有效期 |
+
+---
+
+## 12. 大模型调用日志（排查用）
+
+每个用户消息都会产生一条 `turn_id`；该轮里的**每次 HTTP 尝试**（重试算两次）都会写一对记录：
+`phase=start`（请求出发前）与 `phase=end`（返回或失败后），两条共用 `call_id`。
+同时镜像一行到进程日志（`llm call ok` / `llm call failed`），所以 `docker logs` 里也能追。
+
+```
+data/llm_calls.jsonl       # 一行一个 JSON 事件，追加写
+```
+
+| 级别 | 记什么 | 什么时候用 |
+|---|---|---|
+| `off` | 什么都不记 | 完全不要日志 |
+| `summary` | turn/call/请求 id、消息数、角色序列、prompt 字数、工具数、耗时、HTTP 状态、finish_reason、token、错误类型 | 线上常态：出问题能定位到"哪一次、多慢、谁报的错" |
+| `detail` | 上面 + 每条消息的角色/字数/200 字预览 + 工具调用名与参数 | 默认值。模型答错、工具选错、上下文跑偏时 |
+| `full` | 上面 + 完整请求体与响应体（按 `LLM_LOG_BODY_CHARS` 截断） | 要向上游复现报错原文时 |
+
+关键字段：
+
+| 字段 | 说明 |
+|---|---|
+| `turn_id` / `round` / `attempt` | 一条用户消息 / 第几轮模型调用 / 第几次重试 |
+| `request_id` | 与 HTTP 响应头 `X-Request-ID`、`tool_executions`、审计表一致，可跨层串起来 |
+| `prompt_chars` / `request_bytes` / `tool_count` | 上下文与工具 schema 的体积：排查"慢且贵"先看这里（工具 schema 约 13 KB，比首轮 prompt 还大） |
+| `latency_ms` / `http_status` / `finish_reason` | 单次尝试的耗时与上游结果 |
+| `usage.*_tokens` | 上游返回的计费口径；上游不返回则为空 |
+| `provider_request_id` | 上游 `x-request-id`，找厂商提工单时直接给这个 |
+| `error_kind` | `network` / `timeout` / `canceled` / `http_status` / `decode` / `provider` / `empty_choices`，先看这个再读 `error` |
+| `upstream_body` | **仅失败时**保留上游原始响应（截断 1024 字）：400 的真实原因通常只在这里 |
+| `messages[].preview` / `tool_calls[].arguments` | 请求侧内容，只在 `start` 行，`end` 行不重复 |
+
+常用查询：
+
+```bash
+# 某条用户消息引发的所有模型调用（含重试与工具轮次）
+jq -c 'select(.turn_id=="turn_xxx") | {phase,round,attempt,latency_ms,ok,finish_reason}' data/llm_calls.jsonl
+
+# 只看失败，按错误类型聚合
+jq -r 'select(.phase=="end" and .ok==false) | .error_kind' data/llm_calls.jsonl | sort | uniq -c
+
+# 失败时上游到底说了什么
+jq -c 'select(.phase=="end" and .ok==false) | {ts,http_status,error,upstream_body}' data/llm_calls.jsonl
+
+# 一次会话的 token 与耗时趋势
+jq -c 'select(.phase=="end" and .conversation_id=="conv-xxx") | {round,latency_ms,total_tokens:.usage.total_tokens}' data/llm_calls.jsonl
+
+# 本次请求实际发了哪些消息
+jq -c 'select(.phase=="start" and .request_id=="req_xxx") | .messages[] | {role,chars,preview}' data/llm_calls.jsonl
+```
+
+隐私与安全：
+
+- 落盘前对手机号（`138****5678`）、18 位身份证、邮箱做掩码；订单号、金额、逗留时长保留——它们是排查必需的事实。
+- API Key 只进 `Authorization` 头，**任何级别都不会写入日志**。
+- 文件以 `0600` 创建，内容仍属客户数据，不要直接贴到公开渠道。
+- `full` 级别会写入整段对话文本，仅限本地/临时排障使用。
+
+已知限制：没有内建切割与保留策略，长时间运行需要外部按天切割或清理（`data/` 已在 `.gitignore` 里）。

@@ -39,6 +39,9 @@ type ModelRequest struct {
 	Tools       []map[string]any
 	Temperature float64
 	MaxTokens   int
+	// Meta is correlation context for the call log. Adapters must never send it
+	// to the provider.
+	Meta CallMeta
 }
 
 // ModelResponse is one completion result.
@@ -47,6 +50,8 @@ type ModelResponse struct {
 	ToolCalls    []ToolCall
 	FinishReason string
 	PromptChars  int
+	// Usage is provider-reported token accounting; nil when the provider omits it.
+	Usage *CallUsage
 }
 
 // ChatModel is the only LLM dependency of the business code.

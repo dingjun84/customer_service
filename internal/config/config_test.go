@@ -72,6 +72,7 @@ func baseConfig() config.Config {
 		AppEnv: "test", HTTPAddr: ":8080", DBPath: "./data/test.db", LogLevel: "info",
 		DevAPIEnabled: true, LLMEnabled: false,
 		LLMTimeout: 30 * time.Second, LLMMaxToolRounds: 5, LLMMaxToolCalls: 8,
+		LLMLogLevel: "detail", LLMLogFile: "./data/llm_calls.jsonl", LLMLogBodyChars: 4000,
 		ConversationRecentTurns: 6, ConversationMaxChars: 40000,
 		PendingActionTTL: 10 * time.Minute, ToolTimeout: 10 * time.Second,
 		AfterSalesWindowDays: 7, PriceProtectionDays: 15,

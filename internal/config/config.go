@@ -28,6 +28,12 @@ type Config struct {
 	LLMMaxToolRounds int
 	LLMMaxToolCalls  int
 
+	// Model-call logging. Kept as strings/ints here so the config package does not
+	// depend on the ai package; cmd/server parses the level.
+	LLMLogLevel     string
+	LLMLogFile      string
+	LLMLogBodyChars int
+
 	ConversationRecentTurns int
 	ConversationMaxChars    int
 	PendingActionTTL        time.Duration
@@ -81,6 +87,9 @@ func Load() (Config, error) {
 		LLMTimeout:              seconds("LLM_TIMEOUT_SECONDS", 30),
 		LLMMaxToolRounds:        integer("LLM_MAX_TOOL_ROUNDS", 5),
 		LLMMaxToolCalls:         integer("LLM_MAX_TOOL_CALLS_PER_TURN", 8),
+		LLMLogLevel:             str("LLM_LOG_LEVEL", "detail"),
+		LLMLogFile:              str("LLM_LOG_FILE", "./data/llm_calls.jsonl"),
+		LLMLogBodyChars:         integer("LLM_LOG_BODY_CHARS", 4000),
 		ConversationRecentTurns: integer("CONVERSATION_RECENT_TURNS", 6),
 		ConversationMaxChars:    integer("CONVERSATION_MAX_CONTEXT_CHARS", 40000),
 		PendingActionTTL:        minutes("PENDING_ACTION_TTL_MINUTES", 10),
@@ -150,6 +159,14 @@ func (c Config) Validate() error {
 	}
 	if c.LLMMaxToolCalls <= 0 || c.LLMMaxToolCalls > 40 {
 		return fmt.Errorf("LLM_MAX_TOOL_CALLS_PER_TURN must be within 1..40, got %d", c.LLMMaxToolCalls)
+	}
+	switch strings.ToLower(strings.TrimSpace(c.LLMLogLevel)) {
+	case "", "off", "none", "disabled", "summary", "detail", "full":
+	default:
+		return fmt.Errorf("LLM_LOG_LEVEL must be off/summary/detail/full, got %q", c.LLMLogLevel)
+	}
+	if c.LLMLogBodyChars < 200 || c.LLMLogBodyChars > 200000 {
+		return fmt.Errorf("LLM_LOG_BODY_CHARS must be within 200..200000, got %d", c.LLMLogBodyChars)
 	}
 	if c.ConversationRecentTurns < 1 {
 		return fmt.Errorf("CONVERSATION_RECENT_TURNS must be >= 1, got %d", c.ConversationRecentTurns)
