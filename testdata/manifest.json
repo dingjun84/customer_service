@@ -1,0 +1,76 @@
+{
+  "amount_unit": "minor",
+  "anchor": "2026-10-20T04:00:00Z",
+  "counts": {
+    "action_audit_logs": 7,
+    "conversations": 89,
+    "customer_benefits": 51,
+    "customers": 20,
+    "invoices": 28,
+    "knowledge_articles": 32,
+    "message_annotations": 134,
+    "messages": 461,
+    "order_items": 168,
+    "orders": 118,
+    "payments": 114,
+    "pending_actions": 12,
+    "products": 72,
+    "promotions": 13,
+    "refunds": 34,
+    "service_cases": 38,
+    "service_tickets": 14,
+    "shipment_events": 588,
+    "shipments": 100,
+    "skus": 123,
+    "tool_executions": 193
+  },
+  "currency": "CNY",
+  "dataset": "customer-service-demo",
+  "generator": "internal/seed",
+  "invariants": [
+    "订单实付 = 成功支付合计；已退 = 成功退款合计；退款 ≤ 实付",
+    "售后单客户与商品行必须属于同一订单",
+    "包裹状态与最后一条轨迹一致，轨迹不晚于数据锚点",
+    "已完成订单必有签收轨迹；已取消订单无在途或签收包裹",
+    "发票金额 ≤ 实付；整单退款后发票必须红冲",
+    "工具失败必有 error_code，成功必与消息中的结果逐字一致",
+    "会话消息序号严格递增，工具调用与执行日志一一对应"
+  ],
+  "privacy": {
+    "addresses": "测试省/测试市/模拟路（虚构地址）",
+    "emails": "@example.test",
+    "id_numbers": "不生成身份证号",
+    "names": "虚构姓名",
+    "payment": "仅保留 mock 交易号，无真实凭证",
+    "phones": "1380000xxxx（测试号段）"
+  },
+  "scenarios": {
+    "by_category": {
+      "人工客服接入": 5,
+      "优惠价格活动": 5,
+      "发票业务": 6,
+      "商品售前咨询": 6,
+      "商品质量故障": 7,
+      "投诉与闲聊情绪": 5,
+      "支付金融": 6,
+      "物流配送": 11,
+      "补发催件": 6,
+      "订单修改": 14,
+      "退换货保修": 8,
+      "退款业务": 10
+    },
+    "by_risk": {
+      "critical": 7,
+      "high": 38,
+      "low": 9,
+      "normal": 35
+    },
+    "by_split": {
+      "dev": 79,
+      "holdout": 10
+    },
+    "total": 89
+  },
+  "seed": 20261020,
+  "synthetic": true
+}

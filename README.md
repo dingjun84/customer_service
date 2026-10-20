@@ -1,0 +1,260 @@
+# 电商 AI 客服 MVP（Go + SQLite + Tool Calling）
+
+按 `docs/ecommerce_ai_customer_service_mvp_spec.md` 实现的本地可运行业务系统：大模型通过受控工具查询模拟电商数据，需要办理业务时先生成**待确认操作**，用户显式确认后才在事务中写入并留下审计记录。
+
+- 技术栈：Go 1.22+（`net/http` 路由）、SQLite（`modernc.org/sqlite`，无 CGo）、`database/sql` 显式 SQL、OpenAI-compatible tool calling。
+- 单体模块化：一个服务、一个数据库、清晰的包边界，没有 ORM / 消息队列 / 向量库。
+- 不接真实支付、物流、发票、客服平台；全部为虚构演示数据。
+
+---
+
+## 1. 快速开始
+
+> 若 `go` 不在 `PATH` 中（例如使用托管工具链），先 `export PATH="$HOME/.workbuddy/binaries/go/bin:$PATH"`，或 `make run GO=/绝对路径/go`。
+
+```bash
+# 1) 准备配置（可选：程序也会读 .env，已存在的环境变量优先）
+cp .env.example .env
+
+# 2) 写入虚构演示数据（幂等，可重复执行）
+make seed
+
+# 3) 启动服务：自动建目录、跑 migration
+make run
+
+# 4) 打开浏览器使用控制台（静态页内嵌在同一个进程里）
+open http://localhost:8080
+
+# 5) 健康检查
+curl http://localhost:8080/healthz
+curl http://localhost:8080/readyz
+
+# 6) 或用命令行创建会话（CUST-1001 由 seed 创建）
+curl -X POST http://localhost:8080/api/v1/conversations \
+  -H 'Content-Type: application/json' \
+  -H 'X-Demo-Customer-ID: CUST-1001' \
+  -d '{"channel":"web_demo"}'
+```
+
+默认 `LLM_ENABLED=false` 时聊天接口返回 `503 llm_unavailable`（用户消息仍会落库）。两种方式让它能对话：离线演示模型（无需密钥）或真实模型。
+
+**A. 离线演示模型**（本地体验用，规则匹配，不是大模型）：
+
+```bash
+LLM_PROVIDER=offline make run
+```
+
+**B. 真实模型**（支持 tool calling 的 OpenAI-compatible 端点）：
+
+```bash
+export LLM_ENABLED=true
+export LLM_BASE_URL=https://api.deepseek.com/v1     # 或本地 llama.cpp / vLLM 的 /v1
+export LLM_API_KEY=sk-xxx
+export LLM_MODEL=deepseek-chat
+export LLM_PROVIDER=openai
+make run
+# 可选：单轮真实链路自检（不进入 CI）
+make smoke-llm
+```
+
+---
+
+## 2. Web 控制台
+
+控制台由 `web/` 目录内嵌进服务端（`go:embed`），**不需要 node/npm，也没有单独的前端进程**。`make run` 后打开 <http://localhost:8080> 即可。
+
+![控制台](docs/screenshots/console-light.png)
+
+待确认卡片与工具轨迹（暗色主题见 `docs/screenshots/console-dark.png`）：
+
+![待确认卡片](docs/screenshots/console-confirm-card.png)
+
+| 区域 | 能做什么 |
+|---|---|
+| 顶栏 | 切换演示身份（CUST-1001 / CUST-1002）、查看对话模型模式、全局刷新 |
+| 左栏 | 新建会话、会话列表（状态 / 时间 / 待确认数量） |
+| 中间 | 聊天、工具调用条（工具名 + 状态 + 耗时）、待确认操作卡片（预览 / 倒计时 / 确认 / 拒绝）、快捷提问、失败重试 |
+| 右栏 · 订单 | 状态筛选、订单详情、物流轨迹、售后单、发票 |
+| 右栏 · 商品 | 关键词搜索、SKU 价格与库存 |
+| 右栏 · 链路 | 该会话的工具调用（脱敏入参 / 结果 / 耗时） |
+| 右栏 · 审计 | 确认后的 before / after 快照与执行结果 |
+
+推荐的体验顺序：
+
+1. 新建会话 → 输入「我的订单到哪了」，看模型先查列表再追问。
+2. 输入「我要取消 ORD-10002」→ 出现待确认卡片（此时订单**尚未**变化，可在右栏核对）。
+3. 点「确认执行」→ 聊天里出现执行结果卡，右栏订单状态变成「已取消」，链路/审计出现工具调用与 before-after。
+4. 输入「ORD-10003 到哪了」→ 物流轨迹；「我要取消 ORD-10003」→ 资格拒绝（已发货），不会写任何数据。
+5. 切到 CUST-1002 → 只能看到李四自己的订单，越权请求返回 403。
+
+界面细节：待确认卡片展示 `pending_actions.preview`（订单号 / 预计退款 / 变更前后值），倒计时到 0 提示过期；发送失败时消息已落库，点「重试」会复用同一个 `client_message_id`，不会重复插入。
+
+---
+
+## 3. 演示数据
+
+`go run ./cmd/seed`（`-reset` 清库重写，仅 dev/test）写入一整套有业务因果关系的虚构数据，
+不是随机组合：
+
+| 实体 | 数量 |
+|---|---|
+| 客户 / 商品 / SKU | 20 / 72 / 123 |
+| 订单 / 订单行 | 118 / 168 |
+| 支付 / 退款 | 114 / 34 |
+| 包裹 / 轨迹 | 100 / 588 |
+| 售后单 / 发票 | 38 / 28 |
+| 会话 / 消息 / 工具日志 | 89 / 461 / 193 |
+| 人工工单 / 待确认动作 | 14 / 12 |
+
+订单状态覆盖 `pending_payment 11 / paid 17 / processing 1 / shipped 28 / completed 39 / cancelled 13 / closed 9`，
+并包含预售定金尾款、货到付款、组合支付、重复扣款、拦截、多包裹、丢件、冷链、定制拒退、
+超售后窗口、超价保窗口、退款失败/驳回/处理中、发票红冲与专票被拒等边界故事。
+
+每条订单都是一段脚本化的业务动作序列（支付 → 发货 → 签收 → 售后 → 退款 → 开票），
+金额和状态由动作推导，因此不会出现「退款大于实付」「已签收还在派送」「售后单引用别人的商品行」
+这类矛盾；导入前先在内存校验 14k+ 项断言，写库后再跑 14 条 SQL 复核，任何一项不过就整体回滚。
+
+主客户 `CUST-1001`（张三），对照客户 `CUST-1002`（李四），20 个客户各有 4–9 单。
+评测元数据（场景、期望工具、禁止动作）写在 `testdata/`，不入库，细节见 `testdata/README.md`
+与 `docs/测试数据字段映射审核.md`。
+
+需要按状态找样本时不要写死订单号，直接查库：
+
+```sql
+SELECT order_no FROM orders WHERE order_status = 'shipped' LIMIT 5;
+```
+
+---
+
+## 4. 目录结构
+
+```text
+cmd/server            启动 HTTP 服务（配置 → 迁移 → 装配 → 优雅关闭）
+cmd/seed              幂等演示数据；-reset 仅 dev/test
+cmd/smoke             可选：单轮真实 LLM 链路自检
+internal/config       环境变量、默认值、校验（不含业务规则）
+internal/database     SQLite 连接（PRAGMA）、迁移 runner
+internal/domain       实体、状态枚举、金额/时间工具、业务错误码
+internal/repository   Store 接口 + sqlite 实现（参数化 SQL、事务）
+internal/service      查询服务、资格规则、待确认动作状态机、工单
+internal/tools        17 个工具定义（JSON Schema）、参数校验、分发
+internal/ai           ChatModel 接口、OpenAI 适配器、上下文组装、工具循环
+internal/conversation 会话/消息、客户端重试幂等、调用编排
+internal/httpapi      路由、中间件、DTO、统一错误 Envelope
+web                   控制台页面（go:embed，无构建步骤）
+migrations            0001_init.sql（go:embed）
+docs                  api.md、agent-tool-catalog.md
+```
+
+依赖方向：`httpapi → conversation/tools → service → repository → domain`。`domain` 不依赖数据库/HTTP/LLM；`repository` 不依赖 HTTP。
+
+---
+
+## 5. 安全边界（核心设计）
+
+1. **模型不碰数据库**：没有任何"执行 SQL"的工具，读写只能走 17 个已注册工具，参数先过 JSON Schema 校验（未知字段直接拒绝）。
+2. **身份不可被模型覆盖**：客户身份来自 `X-Demo-Customer-ID`（仅 dev/test）并由中间件写入 context；所有工具都不接受 `customer_id` 参数，服务层再做一次归属校验。
+3. **写操作两段式**：`request_order_cancellation` / `modify_order` / `submit_service_request` 只创建 `pending_actions`；确认接口重新读取订单、重跑资格校验、乐观锁版本比对，然后才在同一事务里写业务表 + 审计 + 关闭动作。
+4. **确认幂等**：`pending → confirmed` 是原子条件更新，只有一个请求能执行；重复确认返回已存储结果（`idempotent: true`），不会二次取消或二次建售后单。
+5. **字段白名单**：改地址只接受 10 个字段；`receiver_phone` 只落脱敏值；金额、状态、商品、客户字段在 schema 和服务层双重拦截。
+6. **事实优先**：退款是否到账以 `refunds.refund_status` 为准；知识库只解释政策；工具失败时提示词禁止声称成功。
+7. **错误不泄漏**：响应只有稳定错误码 + 安全文案；SQL、堆栈、密钥只进日志（且工具入参落库前做手机号/地址脱敏）。
+
+---
+
+## 6. API 概览
+
+统一前缀 `/api/v1`，所有请求需要 `X-Demo-Customer-ID`（dev/test）。成功 `{"data":…,"meta":…}`，失败 `{"error":{"code","message","request_id"}}`。完整契约见 [`docs/api.md`](docs/api.md)。
+
+```bash
+# 发消息（同步返回最终答复 + 工具轨迹 + 待确认动作）
+curl -X POST http://localhost:8080/api/v1/conversations/$CID/messages \
+  -H 'Content-Type: application/json' -H 'X-Demo-Customer-ID: CUST-1001' \
+  -d '{"message":"ORD-10002 帮我改下地址","client_message_id":"c-001"}'
+
+# 用户确认执行
+curl -X POST http://localhost:8080/api/v1/conversations/$CID/actions/$AID/confirm \
+  -H 'X-Demo-Customer-ID: CUST-1001'
+
+# 只读业务 API
+curl -H 'X-Demo-Customer-ID: CUST-1001' http://localhost:8080/api/v1/orders
+curl -H 'X-Demo-Customer-ID: CUST-1001' http://localhost:8080/api/v1/orders/ORD-10003
+curl -H 'X-Demo-Customer-ID: CUST-1001' http://localhost:8080/api/v1/orders/ORD-10003/shipments
+
+# 开发诊断（APP_ENV=dev 且 DEV_API_ENABLED=true 才注册）
+curl -H 'X-Demo-Customer-ID: CUST-1001' \
+  http://localhost:8080/api/v1/dev/conversations/$CID/trace
+```
+
+错误码：`bad_request` `validation_error` `unauthorized` `forbidden` `not_found` `conflict` `confirmation_required` `action_expired` `llm_unavailable` `tool_execution_failed` `internal_error`。
+
+---
+
+## 7. 业务规则实现位置
+
+| 规则 | 位置 |
+|---|---|
+| 取消（仅未发货，已揽收拒绝） | `service/eligibility.go: checkCancel` |
+| 改单（10 字段白名单 + 值校验） | `service/eligibility.go: checkModify` |
+| 退换修/退款/补发（7 天、数量、冲突单） | `service/eligibility.go: checkAfterSales` |
+| 价保（15 天 + 活动规则算差额） | `service/eligibility.go: checkPriceProtection` |
+| 待确认动作状态机 + 事务执行 | `service/actions.go` |
+| 工单/转人工 | `service/tickets.go` |
+
+时间窗口通过 `AFTER_SALES_WINDOW_DAYS`、`PRICE_PROTECTION_WINDOW_DAYS` 配置，由服务端计算，模型不参与判断。
+
+---
+
+## 8. 测试
+
+```bash
+gofmt -w .
+go test ./...
+go vet ./...
+```
+
+覆盖（全部使用临时 SQLite 文件，不碰开发库）：
+
+- 仓储：迁移幂等、外键生效、唯一约束映射、游标分页、乐观锁版本冲突、事务回滚。
+- 业务：已发货不可取消/改地址、超期售后、数量超限、部分退款按成交价分摊、越权 403、非白名单字段被拒。
+- 动作：确认写库+退款+审计、重复确认幂等、拒绝不改数据、过期 410、并发版本冲突 409。
+- 工具：未知工具拒绝、非法 JSON / 未知字段 / 枚举越界、只能看到自己的订单。
+- AI：直接回答、单次工具调用、工具失败不编造、未知工具标记 rejected、轮次/调用次数上限、LLM 关闭。
+- HTTP：healthz/readyz、401/403/404/409/410/503、请求体上限、`client_message_id` 重放、dev API 开关。
+- 数据集：规模落在规范区间、12 个一级意图各 ≥5 个场景、多轮 ≥20、高风险 ≥12；并反向测试
+  「退款超额」「签收后在派送」「售后单跨单引用」等矛盾会被校验器拦下（`internal/seed/seed_test.go`）。
+
+`make smoke-llm` 需要真实密钥，可选执行，CI 不依赖。
+
+---
+
+## 9. 已知限制
+
+- 生产鉴权未实现：`X-Demo-Customer-ID` 只在 dev/test 生效，其它环境一律 401（fail-closed）。
+- 单实例：SQLite + WAL，适合本地演示；多实例/高并发写应迁移 PostgreSQL。
+- 无 SSE/WebSocket：一次请求同步返回最终答复。
+- 无 RAG/向量检索：知识库为 SQLite 关键词匹配。
+- 控制台是演示级前端：无登录态、无国际化、无虚拟滚动；几十条会话/订单的规模下够用。
+- 离线演示模型（`LLM_PROVIDER=offline`）只做关键词匹配，用于没有密钥时走通链路，不代表真实模型效果；仅 `dev/test` 允许启用。
+- 价保差额为活动规则里的演示值（`price_protection_diff_minor`），不是真实价格历史比对。
+- `expire` 为惰性执行：每次发消息/确认前清理过期动作，无独立定时任务。
+- `message_annotations` 只由 seed 写入（离线评测用），在线链路不写。
+
+---
+
+## 10. 环境变量
+
+见 `.env.example`。关键项：
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `APP_ENV` | `dev` | `dev/test` 才允许演示身份头与 dev API |
+| `HTTP_ADDR` | `:8080` | 监听地址 |
+| `DB_PATH` | `./data/ecommerce_support.db` | 目录不存在会自动创建 |
+| `DEV_API_ENABLED` | `true` | 非 dev/test 必须为 false，否则拒绝启动 |
+| `LLM_PROVIDER` | `openai` | `openai` 走真实模型；`offline` 用本地规则演示模型（仅 dev/test） |
+| `LLM_ENABLED` / `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | 关闭 | 关闭时聊天返回 `llm_unavailable` |
+| `LLM_MAX_TOOL_ROUNDS` / `LLM_MAX_TOOL_CALLS_PER_TURN` | 5 / 8 | 单条用户消息的硬上限 |
+| `CONVERSATION_RECENT_TURNS` | 6 | 上下文窗口的完整轮次数 |
+| `PENDING_ACTION_TTL_MINUTES` | 10 | 待确认动作有效期 |
+| `TOOL_TIMEOUT_SECONDS` | 10 | 单次工具执行超时 |

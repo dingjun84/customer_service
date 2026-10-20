@@ -1,0 +1,27 @@
+# 本地数据库与构建产物
+data/
+bin/
+server
+customer_service
+
+# 环境变量与密钥
+.env
+.env.local
+
+# 日志与测试产物
+*.log
+*.out
+coverage.*
+*.test
+*.db
+*.db-shm
+*.db-wal
+err.txt
+
+# 编辑器/系统
+.DS_Store
+.idea/
+.vscode/
+
+# 本地 agent 工作区
+.workbuddy/

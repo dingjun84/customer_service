@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>电商智能客服 · 控制台</title>
+<link rel="stylesheet" href="/styles.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f5bea'/%3E%3Ctext x='16' y='22' font-size='14' font-family='sans-serif' fill='white' text-anchor='middle'%3ECS%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+<div class="app" id="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v6a2.5 2.5 0 0 1-2.5 2.5H9l-4 3.5v-3.5A2.5 2.5 0 0 1 4 13.5z"/>
+          <path d="M8.5 9.5h7M8.5 12.5h4"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>电商智能客服 · 控制台</h1>
+        <p>确认式写操作 · 全链路可追溯</p>
+      </div>
+    </div>
+
+    <div class="topbar-right">
+      <div class="model-badge" id="modelBadge" title="对话模型状态">
+        <span class="dot"></span><span class="label">检测中…</span>
+      </div>
+      <label class="identity">
+        <span>演示身份</span>
+        <select id="customerSelect"></select>
+      </label>
+      <button class="btn ghost icon-only" id="refreshAll" title="刷新全部数据" aria-label="刷新全部数据">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/>
+        </svg>
+      </button>
+      <button class="btn ghost icon-only panel-toggle" id="panelToggle" title="数据面板" aria-label="数据面板">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M14.5 4.5v15"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="layout" id="layout">
+
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <div class="sidebar-title">
+          会话 <span class="count" id="convCount">0</span>
+        </div>
+        <button class="btn primary sm" id="newConversation">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          新建
+        </button>
+      </div>
+      <div class="conv-list" id="convList"></div>
+      <div class="sidebar-foot">
+        <p class="foot-note">写操作只会生成「待确认操作」，确认后才落库。切换身份可验证越权隔离。</p>
+      </div>
+    </aside>
+
+    <section class="chat">
+      <div class="chat-head">
+        <div class="chat-head-main">
+          <div class="chat-title" id="chatTitle">未选择会话</div>
+          <div class="chat-sub" id="chatSub">在左侧新建一个会话，或选择已有会话继续</div>
+        </div>
+        <div class="chat-actions">
+          <button class="btn ghost sm" id="closeConversation" disabled>结束会话</button>
+        </div>
+      </div>
+
+      <div class="messages" id="messages"></div>
+
+      <div class="composer" id="composer">
+        <div class="suggest" id="suggestions"></div>
+        <div class="composer-box">
+          <textarea id="composerInput" rows="2" maxlength="2000"
+            placeholder="描述你的问题，例如：我的订单 ORD-10003 到哪了？"></textarea>
+          <div class="composer-bar">
+            <span class="hint">Enter 发送 · Shift + Enter 换行</span>
+            <button class="btn primary" id="sendBtn">
+              发送
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12h13M12 6.5 18 12l-6 5.5"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="inspector" id="inspector">
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="orders" role="tab">订单</button>
+        <button class="tab" data-tab="products" role="tab">商品</button>
+        <button class="tab" data-tab="trace" role="tab">链路</button>
+        <button class="tab" data-tab="audit" role="tab">审计</button>
+      </div>
+
+      <div class="panel active" id="panel-orders" role="tabpanel"></div>
+      <div class="panel" id="panel-products" role="tabpanel"></div>
+      <div class="panel" id="panel-trace" role="tabpanel"></div>
+      <div class="panel" id="panel-audit" role="tabpanel"></div>
+    </aside>
+
+  </main>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<script src="/app.js"></script>
+</body>
+</html>
