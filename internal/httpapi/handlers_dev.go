@@ -6,6 +6,57 @@ import (
 	"github.com/example/ecommerce-support/internal/domain"
 )
 
+// handleListDemoCustomers lists the synthetic identities of the seeded dataset
+// so the browser console can build its identity switcher from the database
+// instead of a hard-coded list. Registered only when APP_ENV is dev/test AND
+// DEV_API_ENABLED=true.
+func (s *Server) handleListDemoCustomers(w http.ResponseWriter, r *http.Request) {
+	const q = `
+SELECT c.customer_no,
+       COALESCE(c.display_name, ''),
+       COALESCE(c.phone_masked, ''),
+       (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id),
+       (SELECT COUNT(*) FROM conversations v WHERE v.customer_id = c.id)
+FROM customers c
+ORDER BY c.customer_no`
+
+	rows, err := s.db.QueryContext(r.Context(), q)
+	if err != nil {
+		writeError(w, r, s.logger, err)
+		return
+	}
+	defer rows.Close()
+
+	views := make([]map[string]any, 0, 32)
+	totalOrders, totalConversations := 0, 0
+	for rows.Next() {
+		var customerNo, name, phone string
+		var orderCount, conversationCount int
+		if err := rows.Scan(&customerNo, &name, &phone, &orderCount, &conversationCount); err != nil {
+			writeError(w, r, s.logger, err)
+			return
+		}
+		totalOrders += orderCount
+		totalConversations += conversationCount
+		views = append(views, map[string]any{
+			"customer_no":        customerNo,
+			"display_name":       name,
+			"phone_masked":       phone,
+			"order_count":        orderCount,
+			"conversation_count": conversationCount,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		writeError(w, r, s.logger, err)
+		return
+	}
+	writeData(w, r, views, map[string]any{
+		"count":              len(views),
+		"order_total":        totalOrders,
+		"conversation_total": totalConversations,
+	})
+}
+
 // handleConversationTrace exposes tool calls and audit records of one conversation.
 // Registered only when APP_ENV is dev/test AND DEV_API_ENABLED=true.
 func (s *Server) handleConversationTrace(w http.ResponseWriter, r *http.Request) {

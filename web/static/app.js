@@ -121,13 +121,16 @@ const FIELD_LABEL = {
   requested_delivery_at: '预约送达', order_remark: '订单备注',
 };
 
-const CUSTOMERS = [
-  { id: 'CUST-1001', name: '张三', note: '主账号 · 12 笔订单' },
-  { id: 'CUST-1002', name: '李四', note: '第二账号 · 1 笔订单' },
+// Fallback only: the real list comes from GET /api/v1/dev/customers so the
+// switcher always matches whatever the seed actually wrote.
+const FALLBACK_CUSTOMERS = [
+  { customer_no: 'CUST-1001', display_name: '张三', order_count: null },
+  { customer_no: 'CUST-1002', display_name: '李四', order_count: null },
 ];
 
 const state = {
-  customer: CUSTOMERS[0].id,
+  customer: FALLBACK_CUSTOMERS[0].customer_no,
+  customers: [],
   ready: null,
   conversations: [],
   conversationId: null,
@@ -231,6 +234,7 @@ function emptyPanel(title, desc) {
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
+  await loadCustomers();
   renderCustomerSelect();
   bindEvents();
   await loadReady();
@@ -239,11 +243,33 @@ async function init() {
   setInterval(tickCountdowns, 15000);
 }
 
+// loadCustomers pulls the seeded identities from the dev API so the switcher
+// shows every customer the dataset contains, not a hard-coded pair.
+async function loadCustomers() {
+  try {
+    const payload = await api('/api/v1/dev/customers');
+    const list = payload.data || [];
+    if (list.length > 0) {
+      state.customers = list;
+      if (!list.some((c) => c.customer_no === state.customer)) {
+        state.customer = list[0].customer_no;
+      }
+      return;
+    }
+  } catch (err) {
+    // Dev API disabled (APP_ENV=prod) or unreachable: keep the fallback pair.
+  }
+  state.customers = FALLBACK_CUSTOMERS;
+}
+
 function renderCustomerSelect() {
   const select = $('#customerSelect');
   clear(select);
-  for (const customer of CUSTOMERS) {
-    select.append(h('option', { value: customer.id }, `${customer.id} · ${customer.name}`));
+  const list = state.customers.length > 0 ? state.customers : FALLBACK_CUSTOMERS;
+  for (const customer of list) {
+    const name = customer.display_name || '';
+    const count = typeof customer.order_count === 'number' ? ` · ${customer.order_count} 单` : '';
+    select.append(h('option', { value: customer.customer_no }, `${customer.customer_no} · ${name}${count}`));
   }
   select.value = state.customer;
 }
@@ -331,6 +357,20 @@ async function loadReady() {
     };
     label.textContent = (modes[mode] || modes.disabled)[0];
     badge.title = (modes[mode] || modes.disabled)[1];
+
+    // Show which database this process actually opened, so "I cannot see the
+    // seeded data" turns into an obvious check instead of a guess.
+    const ds = state.ready.dataset;
+    if (ds) {
+      const file = (state.ready.db_path || '').split('/').pop();
+      badge.title = `${badge.title}｜${state.ready.db_path}`;
+      const sub = document.querySelector('.brand-text p');
+      if (sub) {
+        if (!sub.dataset.original) sub.dataset.original = sub.textContent;
+        sub.title = `数据源 ${state.ready.db_path}`;
+        sub.textContent = `${file || 'sqlite'} · ${ds.orders} 单 / ${ds.conversations} 会话 / ${ds.messages} 消息`;
+      }
+    }
     if (mode === 'disabled') {
       toast('warn', '对话模型未启用',
         '设置 LLM_PROVIDER=offline 可用本地演示模型，或配置 LLM_ENABLED=true + LLM_BASE_URL 接入真实模型。', 9000);
@@ -910,7 +950,7 @@ function renderOrdersPanel() {
   panel.append(panelHead('我的订单', `${state.orders.length} 条`), orderFilters());
 
   if (state.orders.length === 0) {
-    panel.append(emptyPanel('没有符合条件的订单', '换个状态筛选，或切换演示身份查看另一位客户。'));
+    panel.append(emptyPanel('没有符合条件的订单', '换个状态筛选，或在右上角「演示身份」切换到其他客户。'));
     return;
   }
   for (const order of state.orders) {
