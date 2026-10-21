@@ -517,6 +517,44 @@ button { font-family: inherit; font-size: inherit; }
 .tool-chip[data-status="rejected"] .dot { background: var(--warning); }
 .tool-chip .ms { color: var(--faint); }
 
+/* model reason notes: one line of "why" above the reply (demo explainability) */
+.msg .reason {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 86%;
+  margin-bottom: 5px;
+  padding: 4px 9px 4px 8px;
+  border-left: 2px solid var(--border-strong);
+  border-radius: 0 6px 6px 0;
+  background: var(--surface-2);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.msg .reason-tag {
+  flex: none;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--accent-weak);
+  color: var(--accent-text);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+.msg .reason-text { word-break: break-word; }
+.msg .reason-tools {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+.msg .reason.missing {
+  border-left-color: var(--warning-border);
+  background: var(--warning-weak);
+  color: var(--warning);
+}
+.msg .reason.missing .reason-tag { background: transparent; color: var(--warning); }
+
 /* pending confirmation cards */
 .pending-wrap {
   display: flex;

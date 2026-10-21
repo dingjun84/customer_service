@@ -89,6 +89,22 @@ make smoke-llm
 
 界面细节：待确认卡片展示 `pending_actions.preview`（订单号 / 预计退款 / 变更前后值），倒计时到 0 提示过期；发送失败时消息已落库，点「重试」会复用同一个 `client_message_id`，不会重复插入。
 
+### 模型备注（demo 阶段的可解释性）
+
+系统提示词要求模型**每次回复的第一行**先写一句 `备注：<为什么这么做>`（不超过 40 字）。服务端把这一行从正文里解析出来，作为独立字段下发，前端在气泡上方以灰色备注条渲染：
+
+| 场景 | 展示 |
+|---|---|
+| 调工具的那一轮 | `备注 · 第N轮` + 一句话动机 + 本轮工具名 |
+| 直接回答 | `备注` + 一句话动机，紧贴回复气泡 |
+| 模型没遵守格式 | 琥珀色「本轮模型没有给出理由」，一眼看出遵循率 |
+| 兜底/降级 | 备注说明是轮次用尽还是文本为空 |
+
+- 解析在 `internal/ai/reason.go`（兼容 `<备注>…</备注>`、`备注：`、`【备注】`、markdown 加粗等写法；解析不到就原样保留正文，不会吞答案）。
+- 备注存进 `messages.metadata_json`，刷新页面后历史消息仍然显示。
+- API：`POST .../messages` 返回 `reasons[]`（`{round, kind, tool_call|answer, reason, tools[]}`），`GET .../messages` 的每条消息带 `reason`。
+- 离线演示模型（`LLM_PROVIDER=offline`）也会给出备注，来自 `internal/ai/offline.go` 的 `toolReasons` 规则表，所以没有 API key 也能演示这个效果。
+
 ---
 
 ## 3. 运营后台（/admin/）

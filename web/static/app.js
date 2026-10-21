@@ -580,6 +580,14 @@ function messageNode(message) {
   const isUser = message.role === 'user';
   const meta = state.turnMeta[message.id];
   const wrap = h('div', { class: `msg ${isUser ? 'user' : 'assistant'}` });
+
+  // Demo explainability: the model writes one line of "why" before every reply
+  // (and before every tool round). The server strips it out of the text and sends
+  // it separately, so it is rendered here as a note above the bubble.
+  if (!isUser) {
+    for (const note of reasonNotes(message, meta)) wrap.append(note);
+  }
+
   wrap.append(h('div', { class: 'msg-bubble' }, message.content));
 
   if (meta && meta.traces && meta.traces.length > 0) {
@@ -604,6 +612,35 @@ function messageNode(message) {
   if (meta && meta.degraded) metaRow.append(h('span', { class: 'chip', dataset: { status: 'pending' } }, '降级回复'));
   wrap.append(metaRow);
   return wrap;
+}
+
+function reasonNotes(message, meta) {
+  const rows = [];
+  const list = meta && Array.isArray(meta.reasons) ? meta.reasons : [];
+
+  if (list.length > 0) {
+    for (const entry of list) {
+      const isAnswer = entry.kind === 'answer';
+      rows.push(reasonRow(
+        entry.reason,
+        isAnswer ? '备注' : `备注 · 第${entry.round}轮`,
+        isAnswer ? null : entry.tools,
+      ));
+    }
+    return rows;
+  }
+  // History reloaded from the server: only the note of the visible reply survives.
+  if (message.reason) rows.push(reasonRow(message.reason, '备注', null));
+  return rows;
+}
+
+function reasonRow(text, tag, tools) {
+  const note = String(text || '').trim();
+  return h('div', { class: `reason${note ? '' : ' missing'}` },
+    h('span', { class: 'reason-tag' }, tag),
+    h('span', { class: 'reason-text' }, note || '本轮模型没有给出理由'),
+    tools && tools.length ? h('span', { class: 'reason-tools' }, tools.join(' · ')) : null,
+  );
 }
 
 function errorNode(lastError) {
@@ -761,6 +798,7 @@ async function sendMessage(text, clientMessageId) {
     if (data.assistant_message) {
       state.turnMeta[data.assistant_message.id] = {
         traces: data.tool_executions || [],
+        reasons: data.reasons || [],
         degraded: Boolean(data.degraded),
         idempotent: Boolean(data.idempotent),
       };
