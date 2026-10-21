@@ -60,6 +60,7 @@ type MessageView struct {
 	Role      string `json:"role"`
 	Content   string `json:"content"`
 	ToolName  string `json:"tool_name,omitempty"`
+	Reason    string `json:"reason,omitempty"`
 	CreatedAt string `json:"created_at"`
 }
 
@@ -80,6 +81,7 @@ type Turn struct {
 	UserMessage      *MessageView        `json:"user_message,omitempty"`
 	AssistantMessage *MessageView        `json:"assistant_message,omitempty"`
 	ToolExecutions   []ai.ToolTrace      `json:"tool_executions"`
+	Reasons          []ai.TurnReason     `json:"reasons"`
 	PendingActions   []PendingActionView `json:"pending_actions"`
 	Degraded         bool                `json:"degraded,omitempty"`
 	Idempotent       bool                `json:"idempotent,omitempty"`
@@ -289,11 +291,15 @@ func (s *Service) SendMessage(ctx context.Context, in SendInput) (*Turn, error) 
 		ConversationID: conv.ID,
 		UserMessage:    viewPtr(toMessageView(userMsg)),
 		ToolExecutions: run.ToolTraces,
+		Reasons:        run.Reasons,
 		PendingActions: pendingViews(run.PendingActions),
 		Degraded:       run.Degraded,
 	}
 	if turn.ToolExecutions == nil {
 		turn.ToolExecutions = []ai.ToolTrace{}
+	}
+	if turn.Reasons == nil {
+		turn.Reasons = []ai.TurnReason{}
 	}
 	if run.Assistant != nil {
 		turn.AssistantMessage = viewPtr(toMessageView(run.Assistant))
@@ -342,8 +348,24 @@ func toMessageView(m *domain.Message) MessageView {
 		Role:      m.Role,
 		Content:   m.Content,
 		ToolName:  m.ToolName,
+		Reason:    reasonOf(m),
 		CreatedAt: m.CreatedAt.Format(time.RFC3339),
 	}
+}
+
+// reasonOf reads the note persisted in metadata. Rebuilt history therefore shows
+// the same note the live turn returned.
+func reasonOf(m *domain.Message) string {
+	if m.MetadataJSON == "" {
+		return ""
+	}
+	var meta struct {
+		Reason string `json:"reason"`
+	}
+	if err := json.Unmarshal([]byte(m.MetadataJSON), &meta); err != nil {
+		return ""
+	}
+	return meta.Reason
 }
 
 func viewPtr(v MessageView) *MessageView { return &v }

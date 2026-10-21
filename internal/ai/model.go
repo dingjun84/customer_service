@@ -50,6 +50,11 @@ type ModelResponse struct {
 	ToolCalls    []ToolCall
 	FinishReason string
 	PromptChars  int
+	// Reason is the model's own one-line justification for this round: why it is
+	// calling these tools, or why it is answering directly. It is a demo-grade
+	// explainability note, parsed out of Content by NormalizeResponse unless an
+	// adapter already knows it. Never sent back to the provider.
+	Reason string
 	// Usage is provider-reported token accounting; nil when the provider omits it.
 	Usage *CallUsage
 }

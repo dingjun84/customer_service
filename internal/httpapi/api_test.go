@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -298,6 +299,60 @@ func TestChatWithToolCall(t *testing.T) {
 	}
 	if calls := model.Calls(); calls != 2 {
 		t.Fatalf("model calls = %d, want 2 (no call on replay)", calls)
+	}
+}
+
+// The console renders the model's per-round note as a remark above the reply, so
+// the turn response must carry them separately from the answer text.
+func TestTurnReturnsReasonNotes(t *testing.T) {
+	model := ai.NewFake(
+		ai.ModelResponse{
+			Content:   "<备注>物流是实时数据，先查轨迹</备注>",
+			ToolCalls: []ai.ToolCall{{ID: "c1", Name: tools.ToolGetLogisticsStatus, Arguments: `{"order_no":"ORD-10003"}`}},
+		},
+		ai.TextResponse("备注：轨迹已返回，直接回答\n\n你的包裹正在派送中。"),
+	)
+	ts := newTestServer(t, model, nil)
+	convID := ts.newConversation("CUST-1001")
+
+	rec, body := ts.do(http.MethodPost, "/api/v1/conversations/"+convID+"/messages", "CUST-1001",
+		map[string]any{"message": "我的订单 ORD-10003 到哪了？"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body = %v", rec.Code, body)
+	}
+	turn := dataObject(t, body)
+	reasons, ok := turn["reasons"].([]any)
+	if !ok || len(reasons) != 2 {
+		t.Fatalf("reasons = %v, want 2 entries", turn["reasons"])
+	}
+	toolRound := reasons[0].(map[string]any)
+	if toolRound["kind"] != "tool_call" || toolRound["reason"] != "物流是实时数据，先查轨迹" {
+		t.Fatalf("tool round = %v", toolRound)
+	}
+	answerRound := reasons[1].(map[string]any)
+	if answerRound["kind"] != "answer" || answerRound["reason"] != "轨迹已返回，直接回答" {
+		t.Fatalf("answer round = %v", answerRound)
+	}
+
+	assistant := turn["assistant_message"].(map[string]any)
+	if content := assistant["content"].(string); strings.Contains(content, "备注") {
+		t.Fatalf("answer still carries the note: %q", content)
+	}
+	if assistant["reason"] != "轨迹已返回，直接回答" {
+		t.Fatalf("assistant reason = %v", assistant["reason"])
+	}
+
+	// A reloaded message list keeps the note, so history looks the same.
+	_, list := ts.do(http.MethodGet, "/api/v1/conversations/"+convID+"/messages", "CUST-1001", nil)
+	var found bool
+	for _, raw := range dataList(t, list) {
+		msg := raw.(map[string]any)
+		if msg["role"] == "assistant" && msg["reason"] == "轨迹已返回，直接回答" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("reloaded messages lost the note: %v", list)
 	}
 }
 

@@ -153,6 +153,82 @@ func TestOrchestratorSingleToolCallThenAnswer(t *testing.T) {
 	}
 }
 
+// The offline demo model must produce notes too, otherwise the feature cannot be
+// shown without an API key.
+func TestOrchestratorOfflineModelWritesNotes(t *testing.T) {
+	h, orch := newHarness(t, ai.NewOfflineModel(), ai.Limits{MaxRounds: 5, MaxToolCalls: 8})
+
+	result := h.run(orch)
+	if len(result.Reasons) < 2 {
+		t.Fatalf("reasons = %+v, want at least one tool round and one answer", result.Reasons)
+	}
+	for _, row := range result.Reasons {
+		if row.Reason == "" {
+			t.Fatalf("offline round %d (%s) has no note: %+v", row.Round, row.Kind, row)
+		}
+	}
+	if result.Reasons[0].Kind != ai.ReasonKindToolCall || len(result.Reasons[0].Tools) == 0 {
+		t.Fatalf("first round should be a tool round: %+v", result.Reasons[0])
+	}
+	if last := result.Reasons[len(result.Reasons)-1]; last.Kind != ai.ReasonKindAnswer {
+		t.Fatalf("last round should be the answer: %+v", last)
+	}
+}
+
+// The note the model writes before acting must never reach the customer, must be
+// reported per round, and must survive a reload from the database.
+func TestOrchestratorSeparatesReasonNotes(t *testing.T) {
+	model := ai.NewFake()
+	h, orch := newHarness(t, model, ai.Limits{MaxRounds: 5, MaxToolCalls: 8})
+	orderNo, _ := h.shippedOrder()
+	model.Reset(
+		ai.ModelResponse{
+			Content:   "<备注>物流是实时数据，先查轨迹</备注>",
+			ToolCalls: []ai.ToolCall{{ID: "call-1", Name: tools.ToolGetLogisticsStatus, Arguments: fmt.Sprintf(`{"order_no":%q}`, orderNo)}},
+		},
+		ai.TextResponse("备注：轨迹已返回，直接回答\n\n你的包裹正在派送中。"),
+	)
+
+	result := h.run(orch)
+
+	if len(result.Reasons) != 2 {
+		t.Fatalf("reasons = %d, want 2 (%+v)", len(result.Reasons), result.Reasons)
+	}
+	if result.Reasons[0].Kind != ai.ReasonKindToolCall || result.Reasons[0].Tools[0] != tools.ToolGetLogisticsStatus {
+		t.Fatalf("tool reason = %+v", result.Reasons[0])
+	}
+	if result.Reasons[0].Reason != "物流是实时数据，先查轨迹" {
+		t.Fatalf("tool note = %q", result.Reasons[0].Reason)
+	}
+	if result.Reasons[1].Kind != ai.ReasonKindAnswer || result.Reasons[1].Reason != "轨迹已返回，直接回答" {
+		t.Fatalf("answer reason = %+v", result.Reasons[1])
+	}
+
+	// The note is metadata, not content: the bubble must contain only the answer.
+	if strings.Contains(result.Assistant.Content, "备注") {
+		t.Fatalf("assistant content leaked the note: %q", result.Assistant.Content)
+	}
+	if !strings.Contains(result.Assistant.MetadataJSON, "轨迹已返回，直接回答") {
+		t.Fatalf("metadata = %q", result.Assistant.MetadataJSON)
+	}
+
+	// A reloaded conversation rebuilds the same note from metadata.
+	stored, err := h.store.ListRecentMessages(h.ctx, h.conv.ID, 20)
+	if err != nil {
+		t.Fatalf("history: %v", err)
+	}
+	var found bool
+	for _, m := range stored {
+		if m.Role == domain.RoleAssistant && strings.Contains(m.MetadataJSON, "reason") &&
+			!strings.Contains(m.Content, "备注") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("no assistant row kept the note in metadata: %+v", stored)
+	}
+}
+
 func TestOrchestratorToolErrorDoesNotFakeSuccess(t *testing.T) {
 	model := ai.NewFake(
 		ai.ToolCallResponse("call-1", tools.ToolGetOrderDetail, `{"order_no":"ORD-99999"}`),

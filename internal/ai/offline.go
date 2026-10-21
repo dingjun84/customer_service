@@ -35,7 +35,8 @@ var (
 // Respond implements ChatModel.
 func (m *OfflineModel) Respond(_ context.Context, req ModelRequest) (ModelResponse, error) {
 	if len(req.Messages) == 0 {
-		return TextResponse("你好，我是客服助手。你可以直接说订单号，或者告诉我想查什么。"), nil
+		return WithReason(TextResponse("你好，我是客服助手。你可以直接说订单号，或者告诉我想查什么。"),
+			"开场白，先问清用户想办哪件事"), nil
 	}
 	last := req.Messages[len(req.Messages)-1]
 	switch last.Role {
@@ -45,17 +46,28 @@ func (m *OfflineModel) Respond(_ context.Context, req ModelRequest) (ModelRespon
 		if follow, ok := m.followUp(req, last); ok {
 			return follow, nil
 		}
-		return TextResponse(renderToolResult(last.ToolName, last.Content)), nil
+		return WithReason(TextResponse(renderToolResult(last.ToolName, last.Content)),
+			"工具结果已拿到，据实复述关键信息，不再多调工具"), nil
 	case RoleUser:
-		return m.plan(last.Content, req.Messages), nil
+		return withPlanReason(m.plan(last.Content, req.Messages)), nil
 	}
 	// Anything else (system/assistant tail): answer the most recent user turn.
 	for i := len(req.Messages) - 1; i >= 0; i-- {
 		if req.Messages[i].Role == RoleUser {
-			return m.plan(req.Messages[i].Content, req.Messages), nil
+			return withPlanReason(m.plan(req.Messages[i].Content, req.Messages)), nil
 		}
 	}
-	return TextResponse("请告诉我你想处理的订单或问题。"), nil
+	return WithReason(TextResponse("请告诉我你想处理的订单或问题。"), "没有可用的用户问题，追问一次"), nil
+}
+
+// withPlanReason fills the note of a rule-engine reply that requested no tool:
+// either the user asked something outside the rules, or a required argument was
+// missing and the reply is a clarification.
+func withPlanReason(resp ModelResponse) ModelResponse {
+	if resp.Reason != "" || len(resp.ToolCalls) > 0 {
+		return resp
+	}
+	return WithReason(resp, "命中能力边界或缺少必要信息，先说明范围并追问")
 }
 
 // followUp continues a multi-step flow after a read tool ran.
@@ -97,7 +109,7 @@ func (m *OfflineModel) followUp(req ModelRequest, last Message) (ModelResponse, 
 				str(item, "sku_name"), moneyText(item["paid"]))
 		}
 		b.WriteString("\n可以说「第一个」或直接报商品名。")
-		return TextResponse(b.String()), true
+		return WithReason(TextResponse(b.String()), "多商品订单必须由用户指定商品，先追问再提交申请"), true
 	}
 
 	args := map[string]any{
@@ -303,9 +315,9 @@ func (m *OfflineModel) plan(text string, history []Message) ModelResponse {
 		}
 		changes := parseChanges(raw)
 		if len(changes) == 0 {
-			return TextResponse(fmt.Sprintf(
+			return WithReason(TextResponse(fmt.Sprintf(
 				"可以改 %s 的收件信息，但需要你给出新内容，例如：把 %s 的地址改成 深圳市南山区科技园南路 99 号，或把收件电话改成 13900001111。",
-				orderNo, orderNo))
+				orderNo, orderNo)), "缺新的收件内容，先追问具体地址或电话")
 		}
 		return call(tools.ToolModifyOrder, map[string]any{
 			"order_no": orderNo,
@@ -379,12 +391,41 @@ func (m *OfflineModel) plan(text string, history []Message) ModelResponse {
 		"（当前为本地规则演示模型，复杂问题请配置真实模型后体验。）")
 }
 
+// toolReasons explains, in one line, why the rule engine picks a given tool. It
+// is the offline analogue of the note a real model writes: the demo console shows
+// it exactly as it shows a model's own note, so the offline path never looks
+// feature-less.
+var toolReasons = map[string]string{
+	tools.ToolListMyOrders:          "用户没说清是哪一笔订单，先列出名下订单再确认",
+	tools.ToolGetOrderDetail:        "回答前需要订单明细（状态与商品）作为事实来源",
+	tools.ToolGetLogisticsStatus:    "物流节点是实时数据，必须查轨迹后再回答",
+	tools.ToolGetPaymentRefund:      "退款进度只能查支付流水，不能凭印象回答",
+	tools.ToolGetServiceStatus:      "售后进度要查售后单当前状态",
+	tools.ToolGetInvoiceStatus:      "发票状态要查开票记录",
+	tools.ToolGetBenefitsStatus:     "优惠券与权益属于账户数据，需要查询",
+	tools.ToolGetPromotionRules:     "活动规则需要查当前生效的促销配置",
+	tools.ToolSearchKnowledge:       "政策类问题先查知识库，避免口径出错",
+	tools.ToolSearchProducts:        "商品信息需要查在售目录",
+	tools.ToolCheckEligibility:      "写操作前先校验资格，避免提交必然失败的申请",
+	tools.ToolRequestCancellation:   "按流程只创建待确认操作，等用户点击确认",
+	tools.ToolModifyOrder:           "改地址同样只生成待确认操作，不直接落库",
+	tools.ToolSubmitServiceRequest:  "售后申请需要用户确认后才真正提交",
+	tools.ToolTransferToHuman:       "问题超出自动处理范围，转人工更稳妥",
+	tools.ToolCreateComplaintTicket: "投诉需要留存工单，便于后续跟进",
+}
+
+// call is the only place the offline model turns a decision into a tool call.
 func call(name string, args map[string]any) ModelResponse {
 	raw, err := json.Marshal(args)
 	if err != nil {
-		return TextResponse("参数解析失败，请换个说法。")
+		return WithReason(TextResponse("参数解析失败，请换个说法。"), "参数无法序列化，先请用户换个说法")
 	}
-	return ToolCallResponse("offline_call", name, string(raw))
+	resp := ToolCallResponse("offline_call", name, string(raw))
+	resp.Reason = toolReasons[name]
+	if resp.Reason == "" {
+		resp.Reason = "规则命中该动作，先调用对应工具"
+	}
+	return resp
 }
 
 // parseChanges extracts the fields the demo model is able to understand. Only

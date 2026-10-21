@@ -36,10 +36,21 @@ type ToolTrace struct {
 	ErrorCode  string `json:"error_code,omitempty"`
 }
 
+// TurnReason is the model's own justification for one round of the turn: either
+// why it asked for those tools, or why it answered directly. The console renders
+// it as a note above the reply so a demo viewer can follow the decision.
+type TurnReason struct {
+	Round  int      `json:"round"`
+	Kind   string   `json:"kind"`
+	Reason string   `json:"reason"`
+	Tools  []string `json:"tools,omitempty"`
+}
+
 // TurnResult is the outcome of one assistant turn.
 type TurnResult struct {
 	Assistant      *domain.Message
 	ToolTraces     []ToolTrace
+	Reasons        []TurnReason
 	PendingActions []domain.PendingAction
 	Rounds         int
 	ToolCalls      int
@@ -79,6 +90,13 @@ func NewOrchestrator(model ChatModel, registry *tools.Registry, store repository
 const (
 	safeLimitAnswer = "抱歉，这个问题需要更多步骤才能处理完。你可以补充一下具体需求，或者我帮你转接人工客服继续处理。"
 	safeEmptyAnswer = "抱歉，我暂时没能生成有效回复。请换个说法再试一次，或者我帮你转接人工客服。"
+
+	// Guard notes are written by the loop itself, because at that point no model
+	// answer exists to explain — the note must still say why the user sees a
+	// fallback instead of an answer.
+	guardLimitReason  = "已达到单轮工具调用上限，先给兜底话术，避免继续调用工具"
+	guardRoundsReason = "工具轮次已用尽，停止继续调用，给出兜底话术"
+	guardEmptyReason  = "模型没有产出有效文本，改发兜底话术"
 )
 
 // Run executes the tool-calling loop and persists every message it produces.
@@ -137,12 +155,23 @@ func (o *Orchestrator) Run(ctx context.Context, in TurnInput) (*TurnResult, erro
 			return nil, domain.NewError(domain.CodeLLMUnavailable, "智能客服暂时不可用，请稍后重试或转人工").Wrap(err)
 		}
 
+		// The note is separated from the visible answer once, here, so the rest of
+		// the loop only deals with clean content and an explicit reason.
+		resp = NormalizeResponse(resp)
+
 		if len(resp.ToolCalls) == 0 {
-			return o.finish(ctx, in, result, resp.Content, false)
+			return o.finish(ctx, in, result, resp.Reason, resp.Content, false)
 		}
 
 		calls := o.assignCallIDs(resp.ToolCalls)
-		o.persistAssistantCalls(ctx, in, resp.Content, calls)
+		reason := TurnReason{
+			Round:  round,
+			Kind:   ReasonKindToolCall,
+			Reason: resp.Reason,
+			Tools:  callNames(calls),
+		}
+		result.Reasons = append(result.Reasons, reason)
+		o.persistAssistantCalls(ctx, in, resp.Content, reason, calls)
 
 		if usedCalls+len(calls) > o.limits.MaxToolCalls {
 			for _, call := range calls {
@@ -151,7 +180,7 @@ func (o *Orchestrator) Run(ctx context.Context, in TurnInput) (*TurnResult, erro
 				}
 				o.persistToolMessage(ctx, in, call, limited)
 			}
-			return o.finish(ctx, in, result, safeLimitAnswer, true)
+			return o.finish(ctx, in, result, guardLimitReason, safeLimitAnswer, true)
 		}
 
 		assistantMsg := Message{Role: RoleAssistant, Content: resp.Content}
@@ -177,7 +206,7 @@ func (o *Orchestrator) Run(ctx context.Context, in TurnInput) (*TurnResult, erro
 	}
 
 	// Rounds exhausted: return a safe, non-committal answer instead of looping.
-	return o.finish(ctx, in, result, safeLimitAnswer, true)
+	return o.finish(ctx, in, result, guardRoundsReason, safeLimitAnswer, true)
 }
 
 // assignCallIDs gives every tool call a unique server-side ID. Provider IDs are not
@@ -194,22 +223,66 @@ func (o *Orchestrator) assignCallIDs(calls []ToolCall) []ToolCall {
 	return out
 }
 
-func (o *Orchestrator) finish(ctx context.Context, in TurnInput, result *TurnResult, text string, degraded bool) (*TurnResult, error) {
+func callNames(calls []ToolCall) []string {
+	out := make([]string, 0, len(calls))
+	for _, c := range calls {
+		out = append(out, c.Name)
+	}
+	return out
+}
+
+// setAnswerReason keeps exactly one answer-kind note: the last round wins, which
+// is what the user sees attached to the reply.
+func setAnswerReason(reasons []TurnReason, round int, note string) []TurnReason {
+	entry := TurnReason{Round: round, Kind: ReasonKindAnswer, Reason: strings.TrimSpace(note)}
+	if len(reasons) > 0 {
+		last := reasons[len(reasons)-1]
+		if last.Kind == ReasonKindAnswer {
+			reasons[len(reasons)-1] = entry
+			return reasons
+		}
+	}
+	return append(reasons, entry)
+}
+
+// messageMetadata records the note next to the message, so a reloaded
+// conversation still shows why the assistant said what it said.
+func messageMetadata(reason string, degraded bool) string {
+	meta := map[string]any{}
+	if degraded {
+		meta["degraded"] = true
+	}
+	if note := strings.TrimSpace(reason); note != "" {
+		meta["reason"] = note
+	}
+	if len(meta) == 0 {
+		return "{}"
+	}
+	raw, err := json.Marshal(meta)
+	if err != nil {
+		return "{}"
+	}
+	return string(raw)
+}
+
+func (o *Orchestrator) finish(ctx context.Context, in TurnInput, result *TurnResult, reason, text string, degraded bool) (*TurnResult, error) {
 	text = strings.TrimSpace(text)
 	if text == "" {
 		text = safeEmptyAnswer
 		degraded = true
+		reason = guardEmptyReason
 	}
+	// One answer per turn: the note of the visible reply is the last row the UI
+	// shows, so a guard note replaces whatever the model wrote.
+	result.Reasons = setAnswerReason(result.Reasons, result.Rounds, reason)
+
 	msg := &domain.Message{
 		ID:             domain.NewID(),
 		ConversationID: in.Conversation.ID,
 		Role:           domain.RoleAssistant,
 		Content:        text,
-		MetadataJSON:   "{}",
+		MetadataJSON:   messageMetadata(reason, degraded),
 		CreatedAt:      time.Now().UTC().Truncate(time.Second),
-	}
-	if degraded {
-		msg.MetadataJSON = `{"degraded":true}`
 	}
 	if err := o.store.AppendMessage(ctx, msg); err != nil {
 		return nil, domain.AsAppError(err)
@@ -228,12 +301,16 @@ func (o *Orchestrator) finish(ctx context.Context, in TurnInput, result *TurnRes
 
 // persistAssistantCalls stores one assistant row per tool call. Rows are merged
 // back into a single assistant message when rebuilding context.
-func (o *Orchestrator) persistAssistantCalls(ctx context.Context, in TurnInput, content string, calls []ToolCall) {
+func (o *Orchestrator) persistAssistantCalls(ctx context.Context, in TurnInput, content string, reason TurnReason, calls []ToolCall) {
 	now := time.Now().UTC().Truncate(time.Second)
 	for i, call := range calls {
 		text := ""
+		meta := "{}"
 		if i == 0 {
+			// The note belongs to the round, not to one call, so it rides on the
+			// first row of the group.
 			text = content
+			meta = messageMetadata(reason.Reason, false)
 		}
 		msg := &domain.Message{
 			ID:                domain.NewID(),
@@ -243,7 +320,7 @@ func (o *Orchestrator) persistAssistantCalls(ctx context.Context, in TurnInput, 
 			ToolName:          call.Name,
 			ToolCallID:        call.ID,
 			ToolArgumentsJSON: truncate(call.Arguments, 4000),
-			MetadataJSON:      "{}",
+			MetadataJSON:      meta,
 			CreatedAt:         now,
 		}
 		if err := o.store.AppendMessage(ctx, msg); err != nil {
