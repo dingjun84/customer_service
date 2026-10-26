@@ -410,3 +410,27 @@ jq -c 'select(.phase=="start" and .request_id=="req_xxx") | .messages[] | {role,
 - `full` 级别会写入整段对话文本，仅限本地/临时排障使用。
 
 已知限制：没有内建切割与保留策略，长时间运行需要外部按天切割或清理（`data/` 已在 `.gitignore` 里）。
+
+---
+
+## 13. duty-im 数据链路（评测/口吻/意图/知识草稿）
+
+把美团门店 IM 导出（`duty-im-export`，1000 会话 / 16203 条消息）转成评测集、
+口吻样例、意图词表与知识草稿。**原始对话含手机号与地址，只做内部改写与评测，
+不落库、不进训练**；骑手/到店语义不当作仓配物流金标。
+
+```bash
+make im-prep           # data/duty-im-export → testdata/im_export/candidates.jsonl + stats.json
+make scenarios         # 合并 51 条手写 IM 场景，刷新 manifest 与 test_scenarios.jsonl
+go test ./internal/imexport ./internal/ai ./internal/style
+```
+
+| 路径 | 内容 |
+|---|---|
+| `internal/imexport` | 解析、角色映射、打标、十类脱敏、弱标注意图 |
+| `internal/seed/imscenarios.go` | IM 场景合并与准入校验（枚举、工具白名单、PII） |
+| `internal/style` | 八类口吻违规的可执行规则，供反例集与后续打分复用 |
+| `testdata/im_export` · `style` · `intent` · `kb_drafts` | 各阶段产物，见 `testdata/README.md` |
+
+实施细节、验收逐条结果与取舍原因见
+[`docs/duty-im-data-application-report.md`](docs/duty-im-data-application-report.md)。
