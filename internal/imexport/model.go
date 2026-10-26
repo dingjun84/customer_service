@@ -83,6 +83,7 @@ type Stats struct {
 	RedactMediaURLHits   int `json:"redact_media_url_hits"`
 	RedactOrderCardHit   int `json:"redact_order_card_hits"`
 	RedactProductCardHit int `json:"redact_product_card_hits"`
+	RedactEmailHits      int `json:"redact_email_hits"`
 
 	// Ratios 是消息角色占比（%），与实施方案 §1.4 的 44/37/13/5 对照，
 	// 用来判断解析有没有跑偏——如果 role_user 只有 5%，多半是格式没对上。

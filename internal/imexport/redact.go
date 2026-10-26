@@ -16,6 +16,7 @@ const (
 	PlaceholderMediaURL    = "{{MEDIA_URL}}"
 	PlaceholderOrderCard   = "{{ORDER_CARD}}"
 	PlaceholderProductCard = "{{PRODUCT_CARD}}"
+	PlaceholderEmail       = "{{EMAIL}}"
 )
 
 // redactRule 是一条有序规则：顺序决定谁先吃掉文本，手机号必须先于长数字，
@@ -24,16 +25,16 @@ type redactRule struct {
 	key         string
 	re          *regexp.Regexp
 	placeholder string
-	// keepPrefix 用于「前缀保留」型规则，例如「加微信 abc123」只替换号本身。
-	keepPrefix bool
 	// group 指定只替换第几个捕获组（1 起），0 表示替换整体命中。
+	// 「加微信 abc123」这类只替换号本身、保留「加微信」前缀的规则就靠它。
 	group int
 }
 
 // phonePattern / mediaURLPattern 同时被安全网复用：脱敏跑完后仍能命中，
-// 说明规则有漏，需要再抹一次并记 warn。
+// 说明规则有漏，需要再抹一次并记 warn。phonePattern 也要求前后不是数字，
+// 否则 18 位统一社会信用代码里的 11 位片段会被误判成手机号。
 var (
-	phonePattern    = regexp.MustCompile(`1[3-9]\d{9}`)
+	phonePattern    = regexp.MustCompile(`(?:^|[^\d])1[3-9]\d{9}(?:[^\d]|$)`)
 	mediaURLPattern = regexp.MustCompile(`https?://[^\s"'<>，。；、）)]+`)
 )
 
@@ -44,22 +45,32 @@ var redactRules = []redactRule{
 		placeholder: PlaceholderMediaURL,
 	},
 	{
+		// 导流号排在手机号之前：「加V15216899332」是微信号，先按 CONTACT 处理，
+		// 否则会被当成手机号，丢掉「这是导流话术」的语义。
+		key:         "contact",
+		re:          regexp.MustCompile(`(?i)((?:微信|weixin|vx|v信|wx|威信|薇信)\s*(?:号|同号)?\s*[:：]?\s*)([A-Za-z][-_A-Za-z0-9]{4,19}|\d{5,20})`),
+		placeholder: PlaceholderContact,
+		group:       2,
+	},
+	{
+		// 「加下VV13915977921」「➕V13052850715」：必须有「加/添加/搜」前缀，
+		// 避免把正文里单个字母 v 误当导流。
+		key:         "contact",
+		re:          regexp.MustCompile(`((?:加|添加|搜|➕|＋|\+)\s*(?:个|下|一下)?\s*[vV]{1,2}\s*(?:号|同号)?\s*[:：]?\s*)([A-Za-z][-_A-Za-z0-9]{4,19}|\d{5,20})`),
+		placeholder: PlaceholderContact,
+		group:       2,
+	},
+	{
+		// 前后都不能是数字，且允许 +86 前缀；执行顺序上已在导流号之后。
 		key:         "phone",
-		re:          regexp.MustCompile(`\b1[3-9]\d{9}\b`),
+		re:          regexp.MustCompile(`(?:^|[^\d])(?:\+?86)?(1[3-9]\d{9})(?:[^\d]|$)`),
 		placeholder: PlaceholderPhone,
+		group:       1,
 	},
 	{
 		key:         "tel",
 		re:          regexp.MustCompile(`\b(?:0\d{2,3}[-\s]?\d{7,8}|400[-\s]?\d{3}[-\s]?\d{4})\b`),
 		placeholder: PlaceholderTel,
-	},
-	{
-		// 「加微信 abc12345」「vx: shop_01」这类导流号，只换号、保留动词。
-		key:         "contact",
-		re:          regexp.MustCompile(`(?i)((?:加|添加|搜)?\s*(?:微信|weixin|vx|wx|v信|威信|薇信)\s*(?:号)?\s*[:：]?\s*)([A-Za-z][-_A-Za-z0-9]{4,19}|\d{5,20})`),
-		placeholder: PlaceholderContact,
-		keepPrefix:  true,
-		group:       2,
 	},
 	{
 		// 以省级名开头，避免把「我的地址是广东省…」里的「我的地址是」一起吃进去。
@@ -86,8 +97,18 @@ var redactRules = []redactRule{
 		group:       1,
 	},
 	{
+		// 抬头/税号常与邮箱一起给出，邮箱不在 §2.5 的表里，但同样不该落进
+		// 候选池，这里一并替换并单独计数。必须排在长数字之前，否则长邮箱
+		// 前缀里的数字会先把整段吃掉。
+		key:         "email",
+		re:          regexp.MustCompile(`[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}`),
+		placeholder: PlaceholderEmail,
+	},
+	{
+		// 长数字不要求尾部词边界：统一社会信用代码常见「9142000070680457XA」
+		// 这种数字后直接跟字母的写法，加 \b 会整段漏掉。
 		key:         "order_id",
-		re:          regexp.MustCompile(`\b\d{10,}\b`),
+		re:          regexp.MustCompile(`\d{10,}`),
 		placeholder: PlaceholderOrderID,
 	},
 }

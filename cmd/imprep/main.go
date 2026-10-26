@@ -39,9 +39,9 @@ func main() {
 		st.MessagesTotal, st.Ratios["user"], st.Ratios["merchant"], st.Ratios["bot"], st.Ratios["system"])
 	fmt.Printf("套话      自动回复 %d / AI 等待 %d / 媒体 %d / 订单卡 %d / 商品卡 %d\n",
 		st.FlagAutoReply, st.FlagWaitBot, st.FlagMedia, st.FlagOrderCard, st.FlagProductCard)
-	fmt.Printf("脱敏      手机 %d / 座机 %d / 长数字 %d / 联系号 %d / 地址 %d / 客服名 %d / URL %d\n",
+	fmt.Printf("脱敏      手机 %d / 座机 %d / 长数字 %d / 联系号 %d / 地址 %d / 客服名 %d / URL %d / 邮箱 %d\n",
 		st.RedactPhoneHits, st.RedactTelHits, st.RedactOrderIDHits, st.RedactContactHits,
-		st.RedactAddressHits, st.RedactAgentNameHit, st.RedactMediaURLHits)
+		st.RedactAddressHits, st.RedactAgentNameHit, st.RedactMediaURLHits, st.RedactEmailHits)
 	if n := len(st.Warnings); n > 0 {
 		fmt.Printf("警告      %d 条（前 5 条）：\n", n)
 		for i, w := range st.Warnings {

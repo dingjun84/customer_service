@@ -227,6 +227,7 @@ func accumulate(st *Stats, hits map[string]int) {
 	st.RedactAddressHits += hits["address"]
 	st.RedactAgentNameHit += hits["agent_name"]
 	st.RedactMediaURLHits += hits["media_url"]
+	st.RedactEmailHits += hits["email"]
 }
 
 func containsFlag(flags []string, want string) bool {
