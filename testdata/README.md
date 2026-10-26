@@ -6,7 +6,11 @@ SQLite 中，这里只放**不能进库**的评测元数据：
 | 文件 | 作用 |
 |---|---|
 | `manifest.json` | 数据集指纹：锚点、随机种子、各表行数、场景分布、被强制执行的不变量清单 |
-| `scenarios/test_scenarios.jsonl` | 89 条场景，一行一个 JSON，含期望工具、禁止动作、判分标准 |
+| `scenarios/test_scenarios.jsonl` | 140 条场景，一行一个 JSON，含期望工具、禁止动作、判分标准 |
+| `im_export/` | duty-im 导出的脱敏候选池、手写 IM 场景与构建日志，见下 |
+| `style/` | 口吻正例、反例、抽象对照与自动回复负例 |
+| `intent/` | 用户原话短语表、offline 关键词补丁说明与冒烟用例 |
+| `kb_drafts/` | 从 IM 会话改写来的知识库草稿，**入库前必须人工审核** |
 
 场景标注**故意不写进数据库**：如果 `expected_outcome` 存在 `conversations` 表里，模型读上下文时
 就顺带读到了答案。
@@ -66,6 +70,27 @@ go run ./cmd/seed -reset -artifacts testdata
 导入是**两阶段**的：先在内存里校验（14k+ 项断言），全部通过才在单个事务里写入；
 写库后再跑 14 条 SQL 复核（外键、金额闭合、包裹状态、发票红冲等）。任何一项不通过就回滚，
 不会留下半套数据。反例测试见 `internal/seed/seed_test.go`，会故意把数据改坏来证明校验器有效。
+
+## duty-im 数据链路（im_export / style / intent / kb_drafts）
+
+```
+data/duty-im-export  (原始 txt，已被 .gitignore 忽略)
+        │  make im-prep
+        ▼
+testdata/im_export/candidates.jsonl   脱敏候选池，下游只读这一个文件
+        │
+        ├─ scenarios_im.jsonl    手写场景 51 条 → make scenarios 合并进 test_scenarios.jsonl
+        ├─ style/                口吻正例 10 / 反例 10 / 自动回复负例 101
+        ├─ intent/               原话短语 3874 条 + offline 冒烟 21 条
+        └─ kb_drafts/            知识库草稿 10 篇（待人工审核才入库）
+```
+
+- `candidates.jsonl` 只保存 `text_redacted`，原始明文不落盘：手机、座机、长数字、
+  导流号、地址、客服名、URL、订单卡、商品卡、邮箱共十类规则。
+- `scenarios_im.jsonl` 是手写源文件，不要直接改 `scenarios/test_scenarios.jsonl`
+  —— 那是生成产物，`make scenarios` 会按 `scenario_id` 合并重写。
+- 合并时会校验 id 形态、分类/分区/风险枚举、工具白名单、轮次结构与 PII，任何一条
+  不合格直接失败，避免坏数据混进评测集。
 
 ## 场景文件结构
 

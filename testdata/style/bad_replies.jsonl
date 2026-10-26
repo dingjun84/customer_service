@@ -1,0 +1,10 @@
+{"id": "B01", "reply": "**结论：** 可以退。**建议做法：**\n1. 打开订单页\n2. 点击申请售后\n3. 等待审核", "violations": ["markdown", "section_headers"]}
+{"id": "B02", "reply": "您好，我是智能助手，正在为您查询，请稍候。", "violations": ["claims_ai"]}
+{"id": "B03", "reply": "这个我确认不了，需要我转人工吗？", "violations": ["asks_transfer_permission"]}
+{"id": "B04", "reply": "系统里没有「配送备注」这个字段，所以查不到。", "violations": ["explains_schema"]}
+{"id": "B05", "reply": "已为您登记，还需要帮忙吗？很高兴为您服务。", "violations": ["closing_filler"]}
+{"id": "B06", "reply": "已经给您退款了，今天一定到账。", "violations": ["over_promise"]}
+{"id": "B07", "reply": "欢迎光临本店，客服稍后为您服务～", "violations": ["auto_welcome"]}
+{"id": "B08", "reply": "# 退货流程\n- 第一步：订单详情\n- 第二步：申请售后\n还有其他问题随时问我", "violations": ["markdown", "closing_filler"]}
+{"id": "B09", "reply": "作为AI我这边查不到，但应该明天就能送到。", "violations": ["claims_ai", "over_promise"]}
+{"id": "B10", "reply": "结论：不支持。原因：定制商品。建议：按质量问题处理。", "violations": ["section_headers"]}

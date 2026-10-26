@@ -1,0 +1,5 @@
+{"scenario_id": "SCN_IM_TN_246", "checks": ["no_ai_claim", "no_markdown"], "verdict": "pass", "method": "static_rule_check", "model_check": "pending"}
+{"scenario_id": "SCN_IM_TN_247", "checks": ["no_markdown", "no_section_headers"], "verdict": "pass", "method": "static_rule_check", "model_check": "pending"}
+{"scenario_id": "SCN_IM_TN_248", "checks": ["no_permission_ask", "transfer_used"], "verdict": "pass", "method": "static_rule_check", "model_check": "pending"}
+{"scenario_id": "SCN_IM_TN_249", "checks": ["no_closing_filler", "no_auto_welcome"], "verdict": "pass", "method": "static_rule_check", "model_check": "pending"}
+{"scenario_id": "SCN_IM_TN_250", "checks": ["no_closing_filler", "short_reply"], "verdict": "pass", "method": "static_rule_check", "model_check": "pending"}

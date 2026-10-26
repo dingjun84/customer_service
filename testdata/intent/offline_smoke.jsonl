@@ -1,0 +1,21 @@
+{"id": "S01", "utterance": "转人工", "expect_tool": "transfer_to_human", "note": "现有词表"}
+{"id": "S02", "utterance": "我要投诉", "expect_tool": "create_complaint_ticket", "note": "现有词表"}
+{"id": "S03", "utterance": "ORD-10001 能不能取消", "expect_tool": "check_action_eligibility", "note": "现有词表：取消预检"}
+{"id": "S04", "utterance": "帮我取消 ORD-10001", "expect_tool": "request_order_cancellation", "note": "现有词表"}
+{"id": "S05", "utterance": "ORD-10001 地址改成深圳南山区科技园南路 99 号", "expect_tool": "modify_order", "note": "现有词表：白名单改址"}
+{"id": "S06", "utterance": "ORD-10001 退款到账了吗", "expect_tool": "get_payment_refund_status", "note": "现有词表"}
+{"id": "S07", "utterance": "ORD-10001 我要退货", "expect_tool": "get_order_detail", "note": "现有词表：售后先读单"}
+{"id": "S08", "utterance": "ORD-10001 快递到哪儿了", "expect_tool": "get_logistics_status", "note": "新增同义：到哪儿"}
+{"id": "S09", "utterance": "ORD-10001 几天到", "expect_tool": "get_logistics_status", "note": "新增同义：几天到"}
+{"id": "S10", "utterance": "查快递 ORD-10001", "expect_tool": "get_logistics_status", "note": "新增同义：查快递"}
+{"id": "S11", "utterance": "ORD-10001 充不上电了", "expect_tool": "get_order_detail", "note": "新增同义：充不上"}
+{"id": "S12", "utterance": "这个能用吗", "expect_tool": "search_products", "note": "新增同义：能用"}
+{"id": "S13", "utterance": "这个保质期多少", "expect_tool": "search_products", "note": "新增同义：保质期"}
+{"id": "S14", "utterance": "怎么退", "expect_tool": "search_knowledge", "note": "新增同义：怎么退"}
+{"id": "S15", "utterance": "怎么开票", "expect_tool": "search_knowledge", "note": "新增同义：怎么开票"}
+{"id": "S16", "utterance": "ORD-10001 发了吗", "expect_tool": "get_logistics_status", "note": "新增同义：发了吗"}
+{"id": "S17", "utterance": "ORD-10001 少件了", "expect_tool": "get_order_detail", "note": "新增同义：少件"}
+{"id": "S18", "utterance": "有没有优惠活动", "expect_tool": "get_promotion_rules", "note": "现有词表"}
+{"id": "S19", "utterance": "白条能用吗", "expect_tool": "get_customer_benefits_status", "note": "现有词表优先于商品分支"}
+{"id": "S20", "utterance": "ORD-10001 发票怎么开", "expect_tool": "get_invoice_status", "note": "现有词表：发票分支在知识库之前"}
+{"id": "S21", "utterance": "订单", "expect_tool": "list_my_orders", "note": "现有词表"}
