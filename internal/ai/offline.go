@@ -325,7 +325,8 @@ func (m *OfflineModel) plan(text string, history []Message) ModelResponse {
 			"reason":   "用户申请修改收件信息",
 		})
 
-	case has("退货", "换货", "维修", "坏了", "故障", "补发", "漏发", "少发", "没收到", "价保", "降价", "差价", "退款"):
+	case has("退货", "换货", "维修", "坏了", "故障", "补发", "漏发", "少发", "没收到", "价保", "降价", "差价", "退款",
+		"充不上", "充不进", "用不了", "不能用", "开不了机", "没反应", "发错", "错发", "少件"):
 		if has("退款") && has("到账", "进度", "到哪", "什么时候") {
 			resp, waiting := requiresOrder()
 			if waiting {
@@ -341,7 +342,8 @@ func (m *OfflineModel) plan(text string, history []Message) ModelResponse {
 		// model may not invent an order_item_id.
 		return call(tools.ToolGetOrderDetail, map[string]any{"order_no": orderNo})
 
-	case has("物流", "快递", "到哪", "签收", "运单", "发货", "配送"):
+	case has("物流", "快递", "到哪", "签收", "运单", "发货", "配送",
+		"到哪儿", "几天到", "什么时候到", "查快递", "快递不动", "没物流", "发了吗"):
 		resp, waiting := requiresOrder()
 		if waiting {
 			return resp
@@ -368,10 +370,11 @@ func (m *OfflineModel) plan(text string, history []Message) ModelResponse {
 	case has("活动", "满减", "优惠"):
 		return call(tools.ToolGetPromotionRules, map[string]any{"query": raw, "limit": 5})
 
-	case has("规则", "政策", "几天", "多久", "运费", "流程"):
+	case has("规则", "政策", "几天", "多久", "运费", "流程", "怎么退", "怎么开票", "开票流程"):
 		return call(tools.ToolSearchKnowledge, map[string]any{"query": raw, "limit": 3})
 
-	case has("买", "商品", "有卖", "多少钱", "推荐", "规格", "材质", "尺寸", "功率"):
+	case has("买", "商品", "有卖", "多少钱", "推荐", "规格", "材质", "尺寸", "功率",
+		"能用", "通用", "适配", "保质期"):
 		return call(tools.ToolSearchProducts, map[string]any{"query": raw, "limit": 5})
 
 	// "第二个" (or a product name) after the item-selection question continues the
