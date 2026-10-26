@@ -191,6 +191,21 @@ ls -la data/                                                       # dev.db 是�
 SELECT order_no FROM orders WHERE order_status = 'shipped' LIMIT 5;
 ```
 
+### 外部 FAQ 知识库（京东帮助中心）
+
+`docs/jd-faq/` 是从京东帮助中心左侧导航抓下来的 389 条问答（配送 / 支付 / 发票 / 售后），
+`faq.jsonl` 是唯一数据源（标题、正文、原文链接），`00-索引.md` 记录分类统计与入库建议。
+
+```bash
+make kb-import-dry   # 只统计，不写库
+make kb-import       # 写入 knowledge_articles，默认 draft
+make kb-publish      # 复核后置为 published，AI 检索才会命中
+```
+
+以 `article_code`（`JD-PS-001` 这类）为自然键幂等更新，重复执行不会产生重复行；
+只动 `JD-*`，不动 seed 写的 `KB-*`。注意 `make seed -reset` 会清空整张 `knowledge_articles`，
+重灌演示数据后需要再跑一次 `make kb-import`。
+
 ---
 
 ## 5. 目录结构

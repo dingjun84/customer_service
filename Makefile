@@ -2,7 +2,7 @@
 # 若 go 不在 PATH（例如使用托管工具链），可用 make run GO=/path/to/go
 GO ?= go
 
-.PHONY: run seed seed-reset seed-verify test test-race vet fmt build smoke-llm clean
+.PHONY: run seed seed-reset seed-verify test test-race vet fmt build smoke-llm clean kb-import kb-import-dry kb-publish
 
 run:
 	$(GO) run ./cmd/server
@@ -33,6 +33,17 @@ build:
 	mkdir -p bin
 	$(GO) build -o bin/server ./cmd/server
 	$(GO) build -o bin/seed ./cmd/seed
+
+# 京东帮助中心 FAQ（docs/jd-faq/faq.jsonl）→ knowledge_articles
+# 默认写 draft；核对无误后 make kb-publish 才进入 AI 检索
+kb-import:
+	$(GO) run ./cmd/kbimport
+
+kb-import-dry:
+	$(GO) run ./cmd/kbimport -dry-run
+
+kb-publish:
+	$(GO) run ./cmd/kbimport -status published
 
 # 可选：需要 LLM_ENABLED=true 与真实密钥，CI 不执行
 smoke-llm:
