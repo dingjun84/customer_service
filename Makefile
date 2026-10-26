@@ -2,7 +2,13 @@
 # 若 go 不在 PATH（例如使用托管工具链），可用 make run GO=/path/to/go
 GO ?= go
 
-.PHONY: run seed seed-reset seed-verify test test-race vet fmt build smoke-llm clean kb-import kb-import-dry kb-publish
+.PHONY: run seed seed-reset seed-verify test test-race vet fmt build smoke-llm clean kb-import kb-import-dry kb-publish im-prep
+
+# 美团门店 IM 导出 → testdata/im_export/candidates.jsonl + stats.json
+# 这是 P0/P1/P2 的唯一输入口；原始 txt 含手机号与地址，只写脱敏文本
+IM_ROOT ?= ../JDDC-Baseline-Seq2Seq/数据/duty-im-export
+im-prep:
+	$(GO) run ./cmd/imprep -src "$(IM_ROOT)" -out testdata/im_export
 
 run:
 	$(GO) run ./cmd/server
