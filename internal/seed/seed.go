@@ -152,6 +152,18 @@ func (s *Seeder) ExportArtifacts(dir string) error {
 	return writeArtifacts(dir, s.gen)
 }
 
+// BuildArtifacts 只生成评测元数据，不打开数据库。seed 命令在库已存在时会跳过
+// 生成阶段（s.gen 为 nil），此时想刷新 test_scenarios.jsonl 就得靠它。
+func BuildArtifacts(dir string) error {
+	g := newGen(DataAnchor)
+	g.build()
+	if errs := g.errs; len(errs) > 0 {
+		sort.Strings(errs)
+		return fmt.Errorf("生成阶段发现 %d 处不一致：\n%s", len(errs), strings.Join(limit(errs, 8), "\n"))
+	}
+	return writeArtifacts(dir, g)
+}
+
 func (s *Seeder) write(ctx context.Context, ds *dataset) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

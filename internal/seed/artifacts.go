@@ -17,11 +17,19 @@ func writeArtifacts(dir string, g *gen) error {
 		return fmt.Errorf("create artifacts dir: %w", err)
 	}
 
+	// 人工改写自 duty-im 候选池的场景不在生成器里，但在写盘时合并进来，
+	// 这样 make seed-reset 不会把它们冲掉。文件缺失则跳过。
+	imScenarios, err := loadIMScenarios(dir)
+	if err != nil {
+		return err
+	}
+	scenarios := append(append([]scenarioRow{}, g.ds.scenarios...), imScenarios...)
+
 	counts := summaryOf(g.ds)
 	byCategory := map[string]int{}
 	byRisk := map[string]int{}
 	bySplit := map[string]int{}
-	for _, sc := range g.ds.scenarios {
+	for _, sc := range scenarios {
 		byCategory[sc.Category]++
 		byRisk[sc.RiskLevel]++
 		bySplit[sc.Split]++
@@ -55,7 +63,9 @@ func writeArtifacts(dir string, g *gen) error {
 			"action_audit_logs": counts.Audits, "message_annotations": counts.Annotations,
 		},
 		"scenarios": map[string]any{
-			"total":       len(g.ds.scenarios),
+			"total":       len(scenarios),
+			"generated":   len(g.ds.scenarios),
+			"from_im":     len(imScenarios),
 			"by_category": byCategory,
 			"by_risk":     byRisk,
 			"by_split":    bySplit,
@@ -78,7 +88,7 @@ func writeArtifacts(dir string, g *gen) error {
 		return fmt.Errorf("write manifest: %w", err)
 	}
 
-	scenarios := append([]scenarioRow{}, g.ds.scenarios...)
+	scenarios = append([]scenarioRow{}, scenarios...)
 	sort.SliceStable(scenarios, func(i, j int) bool {
 		return scenarios[i].ScenarioID < scenarios[j].ScenarioID
 	})
