@@ -6,7 +6,7 @@ package seed
 // quote or a real product page.
 //
 // Category counts: 3C 18 / 服装鞋包 12 / 礼品定制 10 / 生鲜冷链 12 /
-// 家居小家电 10 / 食品个护 10 = 72 products, 123 SKUs.
+// 家居小家电 10 / 食品个护 11 = 75 products, 129 SKUs（含 IM 场景补齐的缺货/尺码 SKU）。
 
 const (
 	policyStandard      = "standard_7d"   // 7 天无理由
@@ -214,6 +214,7 @@ func catalogDefs() []productDef {
 				{"-02", "白色 L", specs("颜色", "白色", "尺码", "L"), 6900, 90},
 				{"-03", "黑色 L", specs("颜色", "黑色", "尺码", "L"), 6900, 60},
 				{"-04", "黑色 XL", specs("颜色", "黑色", "尺码", "XL"), 6900, 0},
+				{"-05", "白色 S", specs("颜色", "白色", "尺码", "S"), 6900, 80},
 			}},
 		{code: "P014", name: "风野 轻量运动外套", brand: "风野", category: "服装鞋包",
 			desc:  "防风梭织面料，适合春秋通勤与轻运动。",
@@ -230,6 +231,7 @@ func catalogDefs() []productDef {
 				{"-01", "黑色 L", specs("颜色", "黑色", "尺码", "L"), 59900, 25},
 				{"-02", "黑色 XL", specs("颜色", "黑色", "尺码", "XL"), 59900, 15},
 				{"-03", "米白 M", specs("颜色", "米白", "尺码", "M"), 62900, 8},
+				{"-04", "米白 L", specs("颜色", "米白", "尺码", "L"), 62900, 0},
 			}},
 		{code: "P016", name: "轻驰 城市缓震跑鞋", brand: "轻驰", category: "服装鞋包",
 			desc:  "缓震中底，透气网面，日常慢跑适用。",
@@ -571,6 +573,27 @@ func catalogDefs() []productDef {
 			attrs: pattrs(0, policyUnopenedOnly, "片数", "80 抽×6", "成分", "无香无酒精", "保质期", "36 个月"),
 			skus: []skuDef{
 				{"-01", "6 包", specs("抽数", "80 抽×6"), 4900, 70},
+			}},
+
+		// ---------------- IM 场景补齐（3） ----------------
+		{code: "P073", name: "暖行 保温杯 500ml", brand: "暖行", category: "家居小家电",
+			desc:  "500ml 日用保温杯，高 21 厘米，杯口直径 7 厘米。演示机型，非真实在售型号。",
+			attrs: pattrs(0, policyStandard, "容量", "500ml", "高度", "21cm", "杯口直径", "7cm", "材质", "316 不锈钢", "保温", "6 小时"),
+			skus: []skuDef{
+				{"-01", "雾灰 500ml", specs("颜色", "雾灰", "容量", "500ml"), 12900, 55},
+				{"-02", "米白 500ml", specs("颜色", "米白", "容量", "500ml"), 12900, 40},
+			}},
+		{code: "P074", name: "极充 20W 快充头", brand: "极充", category: "3C数码",
+			desc:  "20W USB-C 快充头，兼容主流手机。演示机型。",
+			attrs: pattrs(12, policyStandard, "功率", "20W", "协议", "PD", "插头", "国标", "接口", "USB-C"),
+			skus: []skuDef{
+				{"-01", "白色 20W", specs("颜色", "白色", "功率", "20W"), 4300, 200},
+			}},
+		{code: "P075", name: "净泡 洗衣凝珠", brand: "净泡", category: "食品个护",
+			desc:  "30 颗装洗衣凝珠，淡香型，开封后不支持无理由退货。",
+			attrs: pattrs(0, policyUnopenedOnly, "颗数", "30 颗", "香型", "淡香", "保质期", "24 个月"),
+			skus: []skuDef{
+				{"-01", "30 颗", specs("颗数", "30 颗"), 5900, 90},
 			}},
 	}
 }

@@ -33,18 +33,20 @@ type lineOpt struct {
 }
 
 type orderOpts struct {
-	customer  int // 1-based index of customerDefs
-	addr      int
-	at        time.Time
-	channel   string
-	presale   bool
-	lines     []lineOpt
-	discount  int64
-	freeShip  bool
-	method    string
-	invoice   string
-	remark    string
-	requested *time.Time
+	customer    int // 1-based index of customerDefs
+	addr        int
+	at          time.Time
+	channel     string
+	presale     bool
+	lines       []lineOpt
+	discount    int64
+	freeShip    bool
+	method      string
+	invoice     string
+	remark      string
+	requested   *time.Time
+	no          string // non-empty: fixed order number (skip nextOrderNo)
+	noCompanion bool   // true: never append category companion SKU
 }
 
 type itemDraft struct {
@@ -102,7 +104,10 @@ func (g *gen) newOrder(opts orderOpts) *orderDraft {
 	}
 	addr := def.Addrs[addrIdx]
 
-	no := g.nextOrderNo()
+	no := opts.no
+	if no == "" {
+		no = g.nextOrderNo()
+	}
 	d := &orderDraft{g: g}
 	d.row = orderRow{
 		ID: stableID("order", no), No: no, CustomerID: cust.ID,
@@ -148,7 +153,8 @@ func (g *gen) newOrder(opts orderOpts) *orderDraft {
 	// category, which is what pushes the dataset's order-line count into the
 	// 160-220 range without inventing a second order story. The choice is a
 	// stable hash of the order number, so two runs produce the same basket.
-	if len(opts.lines) == 1 && basketBucket(no) < 40 {
+	// IM world fixtures need exact paid amounts, so they set noCompanion.
+	if !opts.noCompanion && len(opts.lines) == 1 && basketBucket(no) < 40 {
 		base := d.items[0]
 		if comp := companionSKU(base.product.Category); comp != "" && comp != base.sku.Code {
 			if sku := g.skus[comp]; sku != nil {
@@ -339,14 +345,15 @@ func (o *orderDraft) addPayment(at time.Time, method, status string, amount int6
 // ---- logistics ----
 
 type shipOpts struct {
-	carrier   string
-	start     time.Time
-	status    string
-	direction string // forward | reship | return
-	signer    string
-	note      string
-	intercept bool // add an intercept-requested event before the terminal node
-	coldChain bool
+	carrier    string
+	start      time.Time
+	status     string
+	direction  string // forward | reship | return
+	signer     string
+	note       string
+	intercept  bool // add an intercept-requested event before the terminal node
+	coldChain  bool
+	TrackingNo string // optional fixed tracking number (e.g. MOCKSF7002)
 }
 
 type shipEvent struct {
@@ -390,7 +397,7 @@ func (o *orderDraft) ship(opts shipOpts) *shipmentDraft {
 	row := shipmentRow{
 		ID: stableID("shipment", no), No: no, OrderID: o.row.ID,
 		CarrierCode: carrierCode, CarrierName: carrierName,
-		TrackingNo: o.g.nextTrackingNo(carrierCode), Status: finalStatus,
+		TrackingNo: firstNonEmpty(opts.TrackingNo, o.g.nextTrackingNo(carrierCode)), Status: finalStatus,
 		CreatedAt: opts.start.Add(-2 * time.Hour), UpdatedAt: lastAt,
 		LastEventAt: timePtr(lastAt), Direction: opts.direction,
 	}

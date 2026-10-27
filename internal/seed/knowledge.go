@@ -139,6 +139,11 @@ func articleDefs() []articleDef {
 				"拦截仅在「已发货未签收」时受理，拦截成功后退款原路退回；拦截失败会继续派送，需拒收后走退货。" +
 				"派送失败（联系不上/地址不详）会安排二次派送，二次失败后退回仓库。",
 			Keywords: []string{"改地址", "拦截", "二次派送", "拒收", "改派"}},
+		{Code: "KB-LOG-07", Category: "logistics", Title: "分包裹发货与少件核对", Version: 1, Status: "published",
+			Content: "一件订单可能拆成多个包裹分批发货，每个包裹有独立运单号；未到齐前请勿按丢件处理。" +
+				"可在物流详情查看全部运单；全部签收后若仍少件，再提交少件售后并提供开箱照片。" +
+				"承运商信息以轨迹中的承运商名称为准（演示环境为 MOCK 前缀运单）。",
+			Keywords: []string{"分包裹", "只收到一件", "少件", "哪个快递", "运单号"}},
 
 		// ---- 订单修改/取消/预售（4）----
 		{Code: "KB-ORD-01", Category: "order", Title: "订单取消规则", Version: 3, Status: "published",
@@ -191,6 +196,16 @@ func articleDefs() []articleDef {
 				"换货需配件齐全，检测确认非人为损坏后由仓库寄出新品，换货包裹与退件包裹分别独立。" +
 				"人为损坏、进液、私自拆机不在保修范围内。",
 			Keywords: []string{"换货", "维修", "质量问题", "保修", "人为损坏"}},
+		{Code: "KB-RET-07", Category: "after_sales", Title: "退货运费与运费险", Version: 1, Status: "published",
+			Content: "无理由退货的运费由买家承担；质量问题、错发、破损由卖家承担运费。" +
+				"购买运费险的订单，退货寄出后可获最高 15 元补贴，超出部分自理。" +
+				"运费险理赔需提供寄回面单，审核 1-3 个工作日。",
+			Keywords: []string{"退货运费", "运费险", "谁出运费", "寄回"}},
+		{Code: "KB-RET-08", Category: "after_sales", Title: "尺码换货流程", Version: 1, Status: "published",
+			Content: "服装鞋包在签收 15 天内、吊牌完整、未洗涤的，可申请同款换码换色（以库存为准）。" +
+				"换货先提交待确认售后单，用户确认后按短信地址寄回原商品；仓库质检通过后发出新码。" +
+				"目标尺码无货时只能退货退款，不能改发其他款。",
+			Keywords: []string{"换码", "尺码小了", "换大一码", "同款换货"}},
 
 		// ---- 退款（4）----
 		{Code: "KB-REF-01", Category: "refund", Title: "退款到账时间", Version: 3, Status: "published",
@@ -226,6 +241,26 @@ func articleDefs() []articleDef {
 			Content: "订单完成后 30 天内可补开发票，超期需人工申请。开票失败常见原因：税号格式错误、邮箱无效、抬头含特殊字符。" +
 				"失败后可修正信息重新提交，同一订单最多重试 3 次，超过需转人工。",
 			Keywords: []string{"补开发票", "开票失败", "税号格式", "邮箱"}},
+		{Code: "KB-INV-04", Category: "invoice", Title: "电子发票下载与邮箱重发", Version: 1, Status: "published",
+			Content: "电子普通发票开具后可在订单详情下载 PDF；填写的接收邮箱可申请重发一次。" +
+				"邮箱填错导致收不到时，可在开票后 30 天内更正邮箱并重发，不改变抬头与金额。" +
+				"重发由系统自动完成，通常数分钟内到达。",
+			Keywords: []string{"发票邮箱", "重发", "下载发票", "收不到"}},
+		{Code: "KB-INV-05", Category: "invoice", Title: "增值税专用发票申请材料", Version: 1, Status: "published",
+			Content: "申请增值税专用发票需提供：公司名称、纳税人识别号、开户银行、银行账号、注册地址与电话。" +
+				"材料齐全后 3-7 个工作日开具；个人抬头不能开专票。" +
+				"专票为纸质时邮寄到登记地址，电子专票发到企业邮箱。",
+			Keywords: []string{"专票", "增值税", "税号", "开户行"}},
+		{Code: "KB-INV-06", Category: "invoice", Title: "发票开具进度说明", Version: 1, Status: "published",
+			Content: "发票状态含 requested（已提交）、issued（已开具）、rejected（被拒）、red_flushed（已红冲）、voided（作废）。" +
+				"电子普票一般支付后 24-48 小时开具；专票 3-7 个工作日。" +
+				"进度可在订单发票页查看，客服只读状态不代开。",
+			Keywords: []string{"开票进度", "多久开好", "发票状态"}},
+		{Code: "KB-INV-07", Category: "invoice", Title: "抬头错误与红冲重开边界", Version: 1, Status: "published",
+			Content: "已开具发票的抬头/税号错误，必须先红冲再重开，AI 客服无自助红冲工具，需转财务人工。" +
+				"未开具前可直接修改抬头后重新提交。" +
+				"整单退款必须红冲；部分退款按退款金额红冲后重开差额票。",
+			Keywords: []string{"抬头开错", "红冲重开", "少两个字", "改公司名"}},
 
 		// ---- 优惠（4 + 1）----
 		{Code: "KB-PRO-01", Category: "promotion", Title: "优惠券使用规则", Version: 3, Status: "published",
@@ -265,6 +300,11 @@ func articleDefs() []articleDef {
 			Content: "滤芯、刷头、硒鼓等耗材按型号匹配：净化器 F3、电动牙刷 T2、打印机 P1 硒鼓。" +
 				"使用非原装耗材造成的故障不在保修范围内。配件缺失可在签收后 48 小时内申请补发，无需退回整机。",
 			Keywords: []string{"配件", "耗材", "滤芯", "刷头", "兼容"}},
+		{Code: "KB-PRD-04", Category: "product", Title: "库存与补货说明", Version: 1, Status: "published",
+			Content: "商品详情页库存为实时可售数量；显示 0 表示暂时无货，页面「预计补货」仅供参考，不构成承诺。" +
+				"可订阅到货提醒；补货到仓后按订阅顺序通知，不锁库存。" +
+				"下单后因超卖导致无法发货的，客服会主动联系取消并全额退款。",
+			Keywords: []string{"有没有货", "库存", "什么时候有货", "补货"}},
 	}
 }
 

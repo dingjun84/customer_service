@@ -292,6 +292,7 @@ func (g *gen) build() {
 	g.buildBenefits()
 	g.buildOrders()
 	g.buildConversations()
+	g.buildIMWorld()
 }
 
 func (g *gen) buildCatalog() {

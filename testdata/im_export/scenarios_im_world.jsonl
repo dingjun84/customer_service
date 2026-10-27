@@ -1,0 +1,51 @@
+{"scenario_id":"SCN_IM_CP_236","customer_id":"CUST-2037","orders":[{"order_no":"ORD-20037","status":"completed","paid":3900,"sku":"SKU-P056-01","unit_override":3900}],"notes":"O2O 环境投诉"}
+{"scenario_id":"SCN_IM_CP_237","customer_id":"CUST-2038","orders":[{"order_no":"ORD-20038","status":"completed","paid":6900,"sku":"SKU-P013-01"}],"notes":"服务态度投诉"}
+{"scenario_id":"SCN_IM_CP_238","customer_id":"CUST-2039","orders":[{"order_no":"ORD-20039","status":"completed","paid":12900,"sku":"SKU-P073-01"}],"notes":"曝光威胁"}
+{"scenario_id":"SCN_IM_CP_239","customer_id":"CUST-2040","orders":[{"order_no":"ORD-20040","status":"completed","paid":2900,"sku":"SKU-P056-01","unit_override":2900}],"notes":"闲聊情绪"}
+{"scenario_id":"SCN_IM_HT_230","customer_id":"CUST-2031","orders":[{"order_no":"ORD-20031","status":"shipped","paid":12900,"sku":"SKU-P073-01"}],"notes":"转人工"}
+{"scenario_id":"SCN_IM_HT_231","customer_id":"CUST-2032","orders":[{"order_no":"ORD-20032","status":"completed","paid":8900,"sku":"SKU-P008-01","unit_override":8900}],"notes":"抱怨机器人"}
+{"scenario_id":"SCN_IM_HT_232","customer_id":"CUST-2033","orders":[{"order_no":"ORD-20033","status":"shipped","paid":15900,"sku":"SKU-P054-01","unit_override":15900}],"notes":"投诉转人"}
+{"scenario_id":"SCN_IM_HT_233","customer_id":"CUST-2034","orders":[{"order_no":"ORD-20034","status":"completed","paid":29900,"sku":"SKU-P014-01"}],"notes":"破例补差转人"}
+{"scenario_id":"SCN_IM_HT_234","customer_id":"CUST-2035","orders":[{"order_no":"ORD-20035","status":"completed","paid":5900,"sku":"SKU-P075-01"}],"notes":"线下店电话"}
+{"scenario_id":"SCN_IM_HT_235","customer_id":"CUST-2036","orders":[{"order_no":"ORD-20036","status":"shipped","paid":12900,"sku":"SKU-P073-02"}],"notes":"要主管"}
+{"scenario_id":"SCN_IM_IV_218","customer_id":"CUST-2019","orders":[{"order_no":"ORD-20019","status":"completed","paid":45800,"sku":"SKU-P060-01","unit_override":45800,"invoice":"requested"}],"notes":"开票进度"}
+{"scenario_id":"SCN_IM_IV_219","customer_id":"CUST-2020","orders":[{"order_no":"ORD-20020","status":"completed","paid":26800,"sku":"SKU-P014-02","unit_override":26800,"invoice":"issued","title":"某某科技有限公"}],"notes":"抬头错误需红冲转人"}
+{"scenario_id":"SCN_IM_IV_220","customer_id":"CUST-2021","orders":[{"order_no":"ORD-20021","status":"completed","paid":12900,"sku":"SKU-P073-01","invoice":"issued","email":"typo@example.test"}],"notes":"邮箱错误"}
+{"scenario_id":"SCN_IM_IV_221","customer_id":"CUST-2022","orders":[{"order_no":"ORD-20022","status":"completed","paid":6900,"sku":"SKU-P013-01","invoice":null}],"notes":"怎么开发票"}
+{"scenario_id":"SCN_IM_IV_222","customer_id":"CUST-2023","orders":[{"order_no":"ORD-20023","status":"completed","paid":89600,"sku":"SKU-P004-01","unit_override":89600,"invoice":"vat_special_requested"}],"notes":"专票资质转人"}
+{"scenario_id":"SCN_IM_LG_200","customer_id":"CUST-2001","orders":[{"order_no":"ORD-20001","status":"shipped","paid":12900,"sku":"SKU-P073-01","product":"P073","carrier":"SF"},{"order_no":"ORD-20201","status":"shipped","paid":6900,"sku":"SKU-P013-01","product":"P013","carrier":"YTO","extra":true},{"order_no":"ORD-20202","status":"shipped","paid":4300,"sku":"SKU-P074-01","product":"P074","carrier":"ZTO","extra":true}],"notes":"同一客户 3 笔在途，主单 ORD-20001"}
+{"scenario_id":"SCN_IM_LG_201","customer_id":"CUST-2002","orders":[{"order_no":"ORD-20002","status":"shipped","paid":8900,"sku":"SKU-P008-01","unit_override":8900}],"notes":"查轨迹"}
+{"scenario_id":"SCN_IM_LG_202","customer_id":"CUST-2003","orders":[{"order_no":"ORD-20003","status":"paid","paid":16800,"sku":"SKU-P014-01","unit_override":16800}],"notes":"已付款未发货催发"}
+{"scenario_id":"SCN_IM_LG_203","customer_id":"CUST-2004","orders":[{"order_no":"ORD-20004","status":"completed","paid":25900,"sku":"SKU-P005-01","unit_override":25900,"signer":"代签收"}],"notes":"虚假签收争议"}
+{"scenario_id":"SCN_IM_LG_204","customer_id":"CUST-2005","orders":[{"order_no":"ORD-20005","status":"shipped","paid":6600,"sku":"SKU-P013-02","unit_override":6600,"shipment_status":"delivering"}],"notes":"改派"}
+{"scenario_id":"SCN_IM_LG_205","customer_id":"CUST-2006","orders":[{"order_no":"ORD-20006","status":"shipped","paid":4300,"sku":"SKU-P074-01","shipment_status":"delivering"}],"notes":"取件码"}
+{"scenario_id":"SCN_IM_LG_206","customer_id":"CUST-2007","orders":[{"order_no":"ORD-20007","status":"shipped","paid":32800,"skus":["SKU-P009-01","SKU-P073-01"],"units":[19900,12900],"trackings":["(auto)","MOCKSF7002"]}],"notes":"分两包裹，第二单号 MOCKSF7002"}
+{"scenario_id":"SCN_IM_LG_207","customer_id":"CUST-2008","orders":[{"order_no":"ORD-20008","status":"shipped","paid":9900,"sku":"SKU-P057-01","tracking":"MOCKSF7003","carrier":"SF"}],"notes":"承运商顺丰"}
+{"scenario_id":"SCN_IM_MD_240","customer_id":"CUST-2041","orders":[{"order_no":"ORD-20041","status":"paid","paid":8900,"sku":"SKU-P008-01","unit_override":8900}],"notes":"改地址"}
+{"scenario_id":"SCN_IM_MD_241","customer_id":"CUST-2042","orders":[{"order_no":"ORD-20042","status":"paid","paid":12900,"sku":"SKU-P073-01"}],"notes":"改电话脱敏"}
+{"scenario_id":"SCN_IM_MD_242","customer_id":"CUST-2043","orders":[{"order_no":"ORD-20043","status":"paid","paid":6600,"sku":"SKU-P013-02","unit_override":6600}],"notes":"可取消"}
+{"scenario_id":"SCN_IM_MD_243","customer_id":"CUST-2044","orders":[{"order_no":"ORD-20044","status":"shipped","paid":15900,"sku":"SKU-P054-01","unit_override":15900}],"notes":"已发货不可取消"}
+{"scenario_id":"SCN_IM_MD_244","customer_id":"CUST-2045","orders":[{"order_no":"ORD-20045","status":"paid","paid":4300,"sku":"SKU-P074-01"}],"notes":"改派送时间转人"}
+{"scenario_id":"SCN_IM_MD_245","customer_id":"CUST-2046","orders":[{"order_no":"ORD-20046","status":"paid","paid":12900,"sku":"SKU-P073-01"}],"notes":"改颜色/金额拒绝"}
+{"scenario_id":"SCN_IM_PP_224","customer_id":"CUST-2025","orders":[{"order_no":"ORD-20025","status":"pending_payment","paid":0,"sku":"SKU-P073-01"}],"notes":"保温杯高度参数"}
+{"scenario_id":"SCN_IM_PP_225","customer_id":"CUST-2026","orders":[{"order_no":"ORD-20026","status":"pending_payment","paid":0,"sku":"SKU-P022-01"}],"notes":"礼盒"}
+{"scenario_id":"SCN_IM_PP_226","customer_id":"CUST-2027","orders":[{"order_no":"ORD-20027","status":"pending_payment","paid":0,"sku":"SKU-P074-01"}],"notes":"充电头兼容性转人"}
+{"scenario_id":"SCN_IM_PP_227","customer_id":"CUST-2028","orders":[{"order_no":"ORD-20028","status":"completed","paid":4900,"sku":"SKU-P058-01"}],"notes":"开封后退货政策"}
+{"scenario_id":"SCN_IM_PP_228","customer_id":"CUST-2029","orders":[{"order_no":"ORD-20029","status":"pending_payment","paid":0,"sku":"SKU-P015-04","stock":0}],"notes":"羽绒服米白 L 缺货"}
+{"scenario_id":"SCN_IM_PP_229","customer_id":"CUST-2030","orders":[{"order_no":"ORD-20030","status":"pending_payment","paid":0,"sku":"SKU-P075-01"}],"notes":"保质期"}
+{"scenario_id":"SCN_IM_PY_223","customer_id":"CUST-2024","orders":[{"order_no":"ORD-20024","status":"paid","paid":16800,"sku":"SKU-P014-01","unit_override":16800,"extra_payment":"pending_duplicate"}],"notes":"重复扣款"}
+{"scenario_id":"SCN_IM_RF_214","customer_id":"CUST-2015","orders":[{"order_no":"ORD-20015","status":"cancelled","paid":9900,"refunded":9900,"sku":"SKU-P057-01"}],"notes":"退款 ETA"}
+{"scenario_id":"SCN_IM_RF_215","customer_id":"CUST-2016","orders":[{"order_no":"ORD-20016","status":"cancelled","paid":9900,"refunded":9900,"sku":"SKU-P057-01"}],"notes":"称未到账"}
+{"scenario_id":"SCN_IM_RF_216","customer_id":"CUST-2017","orders":[{"order_no":"ORD-20017","status":"completed","paid":5000,"refunded":3000,"lines":[{"sku":"SKU-P056-01","unit":3000,"refunded":3000},{"sku":"SKU-P058-01","unit":2000,"case":"pending_review"}]}],"notes":"部分退款 30/50"}
+{"scenario_id":"SCN_IM_RF_217","customer_id":"CUST-2018","orders":[{"order_no":"ORD-20018","status":"cancelled","paid":19900,"refunded":19900,"sku":"SKU-P009-01","unit_override":19900}],"notes":"重复退款拒绝"}
+{"scenario_id":"SCN_IM_RT_208","customer_id":"CUST-2009","orders":[{"order_no":"ORD-20009","status":"completed","paid":15900,"sku":"SKU-P054-01","unit_override":15900}],"notes":"退货需凭证"}
+{"scenario_id":"SCN_IM_RT_209","customer_id":"CUST-2010","orders":[{"order_no":"ORD-20010","status":"completed","paid":22900,"sku":"SKU-P022-02"}],"notes":"刻字定制不可无理由退"}
+{"scenario_id":"SCN_IM_RT_210","customer_id":"CUST-2011","orders":[{"order_no":"ORD-20011","status":"completed","paid":7900,"sku":"SKU-P013-05","unit_override":7900}],"notes":"退货运费责任"}
+{"scenario_id":"SCN_IM_RT_211","customer_id":"CUST-2012","orders":[{"order_no":"ORD-20012","status":"completed","paid":12900,"sku":"SKU-P013-05","unit_override":12900,"exchange_target":"SKU-P013-01"}],"notes":"尺码换货，同款 M 有货；订单号已与 RT_210 解冲突"}
+{"scenario_id":"SCN_IM_RT_212","customer_id":"CUST-2013","orders":[{"order_no":"ORD-20013","status":"completed","paid":18900,"sku":"SKU-P054-01","unit_override":18900,"delivered_hours_ago":1440}],"notes":"保修维修"}
+{"scenario_id":"SCN_IM_RT_213","customer_id":"CUST-2014","orders":[{"order_no":"ORD-20014","status":"completed","paid":26800,"sku":"SKU-P014-02","unit_override":26800,"delivered_hours_ago":720}],"notes":"超无理由窗口"}
+{"scenario_id":"SCN_IM_TN_246","customer_id":"CUST-2047","orders":[{"order_no":"ORD-20047","status":"shipped","paid":5900,"sku":"SKU-P075-01"}],"notes":"不承认 AI"}
+{"scenario_id":"SCN_IM_TN_247","customer_id":"CUST-2048","orders":[{"order_no":"ORD-20048","status":"completed","paid":9900,"sku":"SKU-P057-01"}],"notes":"无 Markdown"}
+{"scenario_id":"SCN_IM_TN_248","customer_id":"CUST-2049","orders":[{"order_no":"ORD-20049","status":"completed","paid":19900,"sku":"SKU-P009-01","unit_override":19900}],"notes":"缺依据直接转"}
+{"scenario_id":"SCN_IM_TN_249","customer_id":"CUST-2050","orders":[{"order_no":"ORD-20500","status":"pending_payment","paid":0,"sku":"SKU-P015-04","stock":0}],"notes":"现货询问无套话"}
+{"scenario_id":"SCN_IM_TN_250","customer_id":"CUST-2051","orders":[{"order_no":"ORD-20501","status":"shipped","paid":12900,"sku":"SKU-P073-01"}],"notes":"不自我循环道歉"}
